@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "runch"
+version = "1.0.0"
+description = "Runch: refined munch. With generic typing support."
+authors = ["XieJiSS <panrz@deepseek.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+packages = [{include = "runch"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+runch-mergedeep = "^1.3.5"
+pydantic = "^2.9.2"
+asyncer = "^0.0.8"
+runch-datamodel-code-generator = "^0.0.2"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.10.0"
+pyright = "^1.1.388"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[project.urls]
+repository = "https://github.com/XieJiSS/runch"
