@@ -35,7 +35,7 @@ from typing import (
 
 M = TypeVar("M", bound=RunchModel)
 FeatureKey: TypeAlias = Literal["watch_file_update", "merge_example"]
-SupportedExtension: TypeAlias = Literal["yaml", "YAML", "json", "JSON", "toml", "TOML"]
+SupportedExtension: TypeAlias = Literal["yaml", "YAML", "yml", "YML", "json", "JSON", "toml", "TOML"]
 
 _UserCustomFileType: TypeAlias = Literal["_user_custom"]
 _USER_CUSTOM_FILE_TYPE: _UserCustomFileType = "_user_custom"
@@ -44,7 +44,7 @@ _RUNCH_DEFAULT_CONFIG_DIR = os.environ.get(
     "RUNCH_CONFIG_DIR", os.path.join(os.getcwd(), "etc")
 )
 
-_BuiltinSupportedFileType: TypeAlias = Literal["yaml", "json", "toml"]
+_BuiltinSupportedFileType: TypeAlias = Literal["yaml", "yml", "json", "toml"]
 _SupportedFileType: TypeAlias = _BuiltinSupportedFileType | _UserCustomFileType
 
 _normalized_supported_extensions: set[str] = set(get_args(_BuiltinSupportedFileType))
@@ -66,7 +66,7 @@ def file_to_dict(
         # without checking if it is a dict. it is the user's responsibility to ensure the returned data is what they want
         return custom_loader(f.read())
 
-    if ext == "yaml":
+    if ext == "yaml" or ext == "yml":
         config_dict = yaml.safe_load(f)
         # yaml.safe_load may return None if the file is empty, we should make an empty config be a valid config
         if config_dict is None:

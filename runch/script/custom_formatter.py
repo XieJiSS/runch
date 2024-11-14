@@ -108,15 +108,17 @@ class CodeFormatter(CustomCodeFormatter):
             if line.strip() == "":
                 return ""
             else:
-                return " " * 4 + line
+                return line
 
         # add indent
         config_body = "\n".join(map(transform_body_line, config_body.split("\n")))
         config_classes = f"{config_head}\n\n{config_body}"
 
         for old_name, new_name in config_renames.items():
-            old_name_pattern = re.compile(rf" {old_name}\b")
-            config_classes = old_name_pattern.sub(f" {new_name}", config_classes)
+            old_name_pattern_1 = re.compile(rf" {old_name}\b")
+            old_name_pattern_2 = re.compile(rf"\[{old_name}\b")
+            config_classes = old_name_pattern_1.sub(f" {new_name}", config_classes)
+            config_classes = old_name_pattern_2.sub(f"[{new_name}", config_classes)
 
         config_read_directive = f'_{self.config_name}_reader = RunchConfigReader[{config_class_name}Config]("{self.config_name}", config_ext="{self.config_ext}")'
         config_read_directive += (

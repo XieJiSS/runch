@@ -32,9 +32,9 @@ __doc__ = """Usage: python -m runch <config_name> [config_ext]
 
 def file_to_dict(
     f: TextIO,
-    ext: Literal["yaml", "json", "toml"],
+    ext: Literal["yaml", "yml", "json", "toml"],
 ) -> dict[Any, Any]:
-    if ext == "yaml":
+    if ext == "yaml" or ext == "yml":
         config_dict = yaml.safe_load(f)
         # yaml.safe_load may return None if the file is empty, we should make an empty config be a valid config
         if config_dict is None:
@@ -60,7 +60,7 @@ def file_to_dict(
 
 def generate_model(config_name: str, config_ext: str):
     file_ext = config_ext.lower()
-    if file_ext not in ["yaml", "json", "toml"]:
+    if file_ext not in ["yaml", "yml", "json", "toml"]:
         raise ValueError(f"Unsupported file type: {config_ext}")
 
     config_path = os.path.join(_RUNCH_DEFAULT_ETC_DIR, f"{config_name}.{config_ext}")
@@ -76,7 +76,7 @@ def generate_model(config_name: str, config_ext: str):
 
     try:
         with open(config_path, "r") as f:
-            config = file_to_dict(f, cast(Literal["yaml", "json", "toml"], file_ext))
+            config = file_to_dict(f, cast(Literal["yaml", "yml", "json", "toml"], file_ext))
             config_exists = True
     except FileNotFoundError:
         pass
@@ -84,7 +84,7 @@ def generate_model(config_name: str, config_ext: str):
     try:
         with open(example_config_path, "r") as f:
             example_config = file_to_dict(
-                f, cast(Literal["yaml", "json", "toml"], file_ext)
+                f, cast(Literal["yaml", "yml", "json", "toml"], file_ext)
             )
             example_config_exists = True
     except FileNotFoundError:
