@@ -5,6 +5,7 @@ description = "Runch: refined munch, with generic typing support. Manage your co
 authors = ["XieJiSS <panrz@deepseek.com>"]
 license = "Apache-2.0"
 readme = "README.md"
+repository = "https://github.com/XieJiSS/runch.git"
 packages = [{include = "runch"}]
 
 [tool.poetry.dependencies]
@@ -21,6 +22,3 @@ pyright = "^1.1.388"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[project.urls]
-Repository = "https://github.com/XieJiSS/runch.git"
