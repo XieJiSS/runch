@@ -1,6 +1,6 @@
 # Runch
 
-Refined [munch](https://github.com/Infinidat/munch). Provides basic `munch` functionality with additional generic typing support and runtime validation.
+Refined [munch](https://github.com/Infinidat/munch). Provides basic `munch` functionality with additional generic typing support and runtime validation. Manage your config files with ease!
 
 ## Installation
 
