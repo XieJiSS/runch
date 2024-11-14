@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "runch"
-version = "1.0.1"
+version = "1.0.2"
 description = "Runch: refined munch. With generic typing support."
 authors = ["XieJiSS <panrz@deepseek.com>"]
 license = "Apache-2.0"
@@ -23,4 +23,4 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [project.urls]
-repository = "https://github.com/XieJiSS/runch"
+Repository = "https://github.com/XieJiSS/runch.git"
