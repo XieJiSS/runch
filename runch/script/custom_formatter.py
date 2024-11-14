@@ -64,10 +64,10 @@ class CodeFormatter(CustomCodeFormatter):
                 ]
             ),
         )
-        code = code.replace("class Model(", f"class {config_class_name}Config(")
+        code = code.replace("class Model(", f"class {config_class_name}ConfigModel(")
         code = code.replace("(BaseModel):", "(RunchModel):")
 
-        config_head_start = code.find(f"class {config_class_name}Config(RunchModel):")
+        config_head_start = code.find(f"class {config_class_name}ConfigModel(RunchModel):")
         config_head = code[config_head_start:].strip("\n")
 
         config_body_start = code.find(CONFIG_BODY_IDENT)
@@ -120,7 +120,7 @@ class CodeFormatter(CustomCodeFormatter):
             config_classes = old_name_pattern_1.sub(f" {new_name}", config_classes)
             config_classes = old_name_pattern_2.sub(f"[{new_name}", config_classes)
 
-        config_read_directive = f'_{self.config_name}_reader = RunchConfigReader[{config_class_name}Config]("{self.config_name}", config_ext="{self.config_ext}")'
+        config_read_directive = f'_{self.config_name}_reader = RunchConfigReader[{config_class_name}ConfigModel]("{self.config_name}", config_ext="{self.config_ext}")'
         config_read_directive += (
             f"\n{self.config_name} = _{self.config_name}_reader.read_lazy()"
         )
