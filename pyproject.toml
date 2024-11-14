@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "runch"
-version = "1.0.2"
-description = "Runch: refined munch. With generic typing support."
+version = "1.0.3"
+description = "Runch: refined munch, with generic typing support. Manage your config files with ease!"
 authors = ["XieJiSS <panrz@deepseek.com>"]
 license = "Apache-2.0"
 readme = "README.md"
