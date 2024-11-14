@@ -8,6 +8,8 @@ Refined [munch](https://github.com/Infinidat/munch). Provides basic `munch` func
 pip install runch
 ```
 
+If you find any bugs, please submit an issue or a pull request at [GitHub](https://github.com/XieJiSS/runch).
+
 ## Usage
 
 ```python
