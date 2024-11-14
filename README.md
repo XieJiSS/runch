@@ -1,6 +1,8 @@
 # Runch
 
-Refined [munch](https://github.com/Infinidat/munch). Provides basic `munch` functionality with additional generic typing support and runtime validation. Manage your config files with ease!
+Refined [munch](https://github.com/Infinidat/munch). Provides basic munch functionality (attribute-style access for python dicts) with additional generic typing support and runtime validation.
+
+Also provides a config reader that reads config files into predefined `runch` models. Say goodbye to `config["key"]`, `config.get("key")` and runtime errors caused by missing keys!
 
 ## Installation
 
