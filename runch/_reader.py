@@ -35,7 +35,9 @@ from typing import (
 
 M = TypeVar("M", bound=RunchModel)
 FeatureKey: TypeAlias = Literal["watch_file_update", "merge_example"]
-SupportedExtension: TypeAlias = Literal["yaml", "YAML", "yml", "YML", "json", "JSON", "toml", "TOML"]
+SupportedExtension: TypeAlias = Literal[
+    "yaml", "YAML", "yml", "YML", "json", "JSON", "toml", "TOML"
+]
 
 _UserCustomFileType: TypeAlias = Literal["_user_custom"]
 _USER_CUSTOM_FILE_TYPE: _UserCustomFileType = "_user_custom"
@@ -169,7 +171,13 @@ _CONFIG_READER_DEFAULT_FEATURES: dict[FeatureKey, FeatureConfig] = {
 }
 
 
-def set_reader_default_feature(features: dict[FeatureKey, FeatureConfig]):
+def update_reader_default_feature(
+    feature_name: FeatureKey, feature_config: FeatureConfig
+):
+    _CONFIG_READER_DEFAULT_FEATURES[feature_name] = feature_config
+
+
+def set_reader_default_features(features: dict[FeatureKey, FeatureConfig]):
     valid_feature_keys = FeatureKey.__args__
 
     _old_features = _CONFIG_READER_DEFAULT_FEATURES.copy()
