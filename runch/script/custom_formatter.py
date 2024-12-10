@@ -44,6 +44,11 @@ def snake_to_camel(name: str) -> str:
     return "".join(splitted)
 
 
+pydantic_import_re = re.compile(
+    r"from pydantic import ([\w, ]+?)?(?:, )?BaseModel(?:, )?([\w, ]+)?"
+)
+
+
 class CodeFormatter(CustomCodeFormatter):
     config_name: str
     config_ext: str
@@ -55,19 +60,40 @@ class CodeFormatter(CustomCodeFormatter):
 
     def apply(self, code: str) -> str:
         config_class_name = snake_to_camel(self.config_name)
+        pydantic_import_left, pydantic_import_right = pydantic_import_re.search(
+            code
+        ).groups()
+        code = pydantic_import_re.sub("from pydantic import BaseModel", code)
+
+        if pydantic_import_left and pydantic_import_right:
+            pydantic_import = (
+                f"from pydantic import {pydantic_import_left}, {pydantic_import_right}"
+            )
+        elif pydantic_import_left:
+            pydantic_import = f"from pydantic import {pydantic_import_left}"
+        elif pydantic_import_right:
+            pydantic_import = f"from pydantic import {pydantic_import_right}"
+        else:
+            pydantic_import = None
+
+        new_imports = [
+            f"from runch import RunchModel, RunchConfigReader",
+            CONFIG_BODY_IDENT,
+        ]
+
+        if pydantic_import is not None:
+            new_imports.insert(0, pydantic_import)
+
         code = code.replace(
             "from pydantic import BaseModel",
-            "\n".join(
-                [
-                    f"from runch import RunchModel, RunchConfigReader",
-                    CONFIG_BODY_IDENT,
-                ]
-            ),
+            "\n".join(new_imports),
         )
         code = code.replace("class Model(", f"class {config_class_name}ConfigModel(")
         code = code.replace("(BaseModel):", "(RunchModel):")
 
-        config_head_start = code.find(f"class {config_class_name}ConfigModel(RunchModel):")
+        config_head_start = code.find(
+            f"class {config_class_name}ConfigModel(RunchModel):"
+        )
         config_head = code[config_head_start:].strip("\n")
 
         config_body_start = code.find(CONFIG_BODY_IDENT)

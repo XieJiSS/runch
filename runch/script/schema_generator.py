@@ -11,23 +11,17 @@ from tempfile import TemporaryDirectory
 from datamodel_code_generator import InputFileType, generate
 from datamodel_code_generator import DataModelType
 
-from typing import Any, Literal, TextIO, cast
+from typing import Any, Literal, NamedTuple, TextIO, cast
 
-_RUNCH_DEFAULT_ETC_DIR = os.environ.get(
-    "RUNCH_CONFIG_DIR", os.path.join(os.getcwd(), "etc")
-)
-
-__doc__ = """Usage: python -m runch <config_name> [config_ext]
+__doc__ = """Usage: python -m runch <config_path> [config_ext]
     Generate a model definition from a config file.
   
-    config_name: the name of the config file without the extension.
-    config_ext: the extension of the config file. Default is `yaml`.
-    
-    Use RUNCH_CONFIG_DIR environment variable to specify the directory of the config files. Default is `./etc`.
-    
+    config_path: path to your config file.
+    config_ext: content type of your config file. Default is `yaml`.
+        
     Example:
-        python -m runch my_config
-        python -m runch my_config yaml"""
+        python -m runch path/to/my_config.foo
+        python -m runch path/to/my_config.foo yaml"""
 
 
 def file_to_dict(
@@ -58,14 +52,36 @@ def file_to_dict(
         raise ValueError(f"Unsupported file type: {ext}")
 
 
-def generate_model(config_name: str, config_ext: str):
+class FileNameInfo(NamedTuple):
+    name: str
+    ext: str
+
+
+def parse_file_name(file_name: str) -> FileNameInfo:
+    # is a path?
+    if os.path.sep in file_name:
+        raise ValueError(f"Invalid file name: {file_name}")
+
+    name, ext = os.path.splitext(file_name)
+    ext = ext[1:]
+
+    return FileNameInfo(name=name, ext=ext)
+
+
+def generate_model(config_path: str, config_ext: str):
     file_ext = config_ext.lower()
+
     if file_ext not in ["yaml", "yml", "json", "toml"]:
         raise ValueError(f"Unsupported file type: {config_ext}")
 
-    config_path = os.path.join(_RUNCH_DEFAULT_ETC_DIR, f"{config_name}.{config_ext}")
+    config_file_name = os.path.basename(config_path)
+    config_file_name_info = parse_file_name(config_file_name)
+
+    example_config_name = ".".join(
+        [config_file_name_info.name, "example", config_file_name_info.ext]
+    )
     example_config_path = os.path.join(
-        _RUNCH_DEFAULT_ETC_DIR, f"{config_name}.example.{config_ext}"
+        os.path.dirname(config_path), example_config_name
     )
 
     config: dict[Any, Any] = {}
@@ -76,7 +92,9 @@ def generate_model(config_name: str, config_ext: str):
 
     try:
         with open(config_path, "r") as f:
-            config = file_to_dict(f, cast(Literal["yaml", "yml", "json", "toml"], file_ext))
+            config = file_to_dict(
+                f, cast(Literal["yaml", "yml", "json", "toml"], file_ext)
+            )
             config_exists = True
     except FileNotFoundError:
         pass
@@ -99,7 +117,12 @@ def generate_model(config_name: str, config_ext: str):
         example_config, config, strategy=mergedeep.Strategy.TYPESAFE_REPLACE
     )
 
-    config_display_name = config_name + "{.example,}." + config_ext
+    if config_file_name_info.ext != "":
+        display_ext = "." + config_file_name_info.ext
+    else:
+        display_ext = ""
+
+    config_display_name = config_file_name_info.name + "{.example,}" + display_ext
 
     header = f"# Generated from {config_display_name} by runch"
     header += "\n# Please beware some `int` fields might need to be changed to `float` manually."
@@ -118,8 +141,8 @@ def generate_model(config_name: str, config_ext: str):
             custom_file_header=header,
             custom_formatters=["runch.script.custom_formatter"],
             custom_formatters_kwargs={
-                "config_name": config_name,
-                "config_ext": config_ext,
+                "config_name": config_file_name_info.name,
+                "config_ext": config_file_name_info.ext,
             },
             snake_case_field=True,
         )

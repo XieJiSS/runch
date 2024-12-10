@@ -13,12 +13,12 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    config_name = sys.argv[1]
+    config_path = sys.argv[1]
 
     if len(sys.argv) == 3:
         config_ext = sys.argv[2]
     else:
         config_ext = "yaml"
 
-    model = generate_model(config_name, config_ext)
+    model = generate_model(config_path, config_ext)
     print(model)

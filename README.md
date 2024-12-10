@@ -61,20 +61,19 @@ db_name: database
 ## Model Definition Generator
 
 ```bash
-$ python -m runch <config_name> [config_ext]
+$ python -m runch <config_path> [config_ext]
 ```
 
 Manual:
 
 ```
-Generate a model definition from a config file.
+Usage: python -m runch <config_path> [config_ext]
+    Generate a model definition from a config file.
 
-config_name: the name of the config file without the extension.
-config_ext: the extension of the config file. Default is `yaml`.
+    config_path: path to your config file.
+    config_ext: content type of your config file. Default is `yaml`.
 
-Use RUNCH_CONFIG_DIR environment variable to specify the directory of the config files. Default is `./etc`.
-
-Example:
-    python -m runch my_config
-    python -m runch my_config yaml
+    Example:
+        python -m runch path/to/my_config.foo
+        python -m runch path/to/my_config.foo yaml
 ```
