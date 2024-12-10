@@ -125,7 +125,7 @@ def generate_model(config_path: str, config_ext: str):
     config_display_name = config_file_name_info.name + "{.example,}" + display_ext
 
     header = f"# Generated from {config_display_name} by runch"
-    header += "\n# Please beware some `int` fields might need to be changed to `float` manually."
+    header += "\n# Please be aware that `float` fields might be annotated as `int` due to the lack of type info in the config."
 
     with TemporaryDirectory() as temporary_directory_name:
         temporary_directory = Path(temporary_directory_name)
@@ -141,8 +141,10 @@ def generate_model(config_path: str, config_ext: str):
             custom_file_header=header,
             custom_formatters=["runch.script.custom_formatter"],
             custom_formatters_kwargs={
-                "config_name": config_file_name_info.name,
-                "config_ext": config_file_name_info.ext,
+                "config_file_name": config_file_name_info.name,
+                "config_file_ext": config_file_name_info.ext,
+                "config_path": config_path,
+                "config_type": file_ext,
             },
             snake_case_field=True,
         )

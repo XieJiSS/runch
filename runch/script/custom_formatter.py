@@ -1,6 +1,8 @@
+# pyright: basic
+import os
 import re
-from datamodel_code_generator.format import CustomCodeFormatter
 
+from datamodel_code_generator.format import CustomCodeFormatter
 from typing import Any
 
 CONFIG_BODY_IDENT = "# config_body_start"
@@ -50,19 +52,28 @@ pydantic_import_re = re.compile(
 
 
 class CodeFormatter(CustomCodeFormatter):
-    config_name: str
-    config_ext: str
+    config_file_name: str
+    config_file_ext: str
+    config_path: str
+    config_type: str
 
     def __init__(self, formatter_kwargs: dict[str, Any]) -> None:
         super().__init__(formatter_kwargs)
-        self.config_name = formatter_kwargs["config_name"]
-        self.config_ext = formatter_kwargs["config_ext"]
+        self.config_file_name = formatter_kwargs["config_file_name"]
+        self.config_file_ext = formatter_kwargs["config_file_ext"]
+        self.config_path = formatter_kwargs["config_path"]
+        self.config_type = formatter_kwargs["config_type"]
 
     def apply(self, code: str) -> str:
-        config_class_name = snake_to_camel(self.config_name)
-        pydantic_import_left, pydantic_import_right = pydantic_import_re.search(
-            code
-        ).groups()
+        config_class_name = snake_to_camel(self.config_file_name)
+
+        pydantic_import_match = pydantic_import_re.search(code)
+        assert (
+            pydantic_import_match is not None
+        ), "datamodel-code-generator created unexpected result"
+
+        pydantic_import_left, pydantic_import_right = pydantic_import_match.groups()
+
         code = pydantic_import_re.sub("from pydantic import BaseModel", code)
 
         if pydantic_import_left and pydantic_import_right:
@@ -146,15 +157,18 @@ class CodeFormatter(CustomCodeFormatter):
             config_classes = old_name_pattern_1.sub(f" {new_name}", config_classes)
             config_classes = old_name_pattern_2.sub(f"[{new_name}", config_classes)
 
-        config_read_directive = f'_{self.config_name}_reader = RunchConfigReader[{config_class_name}ConfigModel]("{self.config_name}", config_ext="{self.config_ext}")'
+        config_file_fullname = os.path.basename(self.config_path)
+        config_file_path = os.path.dirname(self.config_path)
+
+        config_read_directive = f'_{self.config_file_name}_reader = RunchConfigReader[{config_class_name}ConfigModel]("{config_file_fullname}", config_dir="{config_file_path}", config_type="{self.config_type}")'
         config_read_directive += (
-            f"\n{self.config_name} = _{self.config_name}_reader.read_lazy()"
+            f"\n{self.config_file_name} = _{self.config_file_name}_reader.read_lazy()"
         )
         config_read_directive += (
             "\n\n# uncomment the following line to enable the watch_file_update feature"
         )
         config_read_directive += (
-            f"\n# _{self.config_name}_reader"
+            f"\n# _{self.config_file_name}_reader"
             + '.set_feature("watch_file_update", {"enabled": True, "args": (10,)})'
         )
 

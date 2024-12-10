@@ -1,3 +1,4 @@
+# pyright: basic
 from __future__ import annotations
 
 import asyncio
@@ -19,6 +20,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
+    NamedTuple,
     Self,
     TextIO,
     Type,
@@ -35,9 +37,7 @@ from typing import (
 
 M = TypeVar("M", bound=RunchModel)
 FeatureKey: TypeAlias = Literal["watch_file_update", "merge_example"]
-SupportedExtension: TypeAlias = Literal[
-    "yaml", "YAML", "yml", "YML", "json", "JSON", "toml", "TOML"
-]
+SupportedFileType: TypeAlias = Literal["yaml", "json", "toml"]
 
 _UserCustomFileType: TypeAlias = Literal["_user_custom"]
 _USER_CUSTOM_FILE_TYPE: _UserCustomFileType = "_user_custom"
@@ -46,10 +46,9 @@ _RUNCH_DEFAULT_CONFIG_DIR = os.environ.get(
     "RUNCH_CONFIG_DIR", os.path.join(os.getcwd(), "etc")
 )
 
-_BuiltinSupportedFileType: TypeAlias = Literal["yaml", "yml", "json", "toml"]
-_SupportedFileType: TypeAlias = _BuiltinSupportedFileType | _UserCustomFileType
+_SupportedFileType: TypeAlias = SupportedFileType | _UserCustomFileType
 
-_normalized_supported_extensions: set[str] = set(get_args(_BuiltinSupportedFileType))
+_normalized_supported_file_types: set[str] = set(get_args(SupportedFileType))
 
 
 class FeatureConfig(TypedDict):
@@ -59,7 +58,7 @@ class FeatureConfig(TypedDict):
 
 def file_to_dict(
     f: TextIO,
-    ext: _SupportedFileType,
+    filetype: _SupportedFileType,
     *,
     custom_loader: Callable[[str], dict[Any, Any]] | None = None,
 ) -> dict[Any, Any]:
@@ -68,7 +67,7 @@ def file_to_dict(
         # without checking if it is a dict. it is the user's responsibility to ensure the returned data is what they want
         return custom_loader(f.read())
 
-    if ext == "yaml" or ext == "yml":
+    if filetype == "yaml":
         config_dict = yaml.safe_load(f)
         # yaml.safe_load may return None if the file is empty, we should make an empty config be a valid config
         if config_dict is None:
@@ -78,7 +77,7 @@ def file_to_dict(
                 f"Invalid config format: {f.name} type={type(config_dict)}, expecting a dict"
             )
         return cast(dict[Any, Any], config_dict)
-    elif ext == "json":
+    elif filetype == "json":
         config_dict = json.load(f)
         # we may got a list or even a string / number from json.load, and runtime type checking for these is not supported
         if not isinstance(config_dict, dict):
@@ -86,10 +85,10 @@ def file_to_dict(
                 f"Invalid config format: {f.name} type={type(config_dict)}, expecting a dict"
             )
         return cast(dict[Any, Any], config_dict)
-    elif ext == "toml":
+    elif filetype == "toml":
         # According to tomllib docs, a whole toml document is always parsed into a dict
         return tomllib.loads(f.read())
-    elif ext == _USER_CUSTOM_FILE_TYPE:
+    elif filetype == _USER_CUSTOM_FILE_TYPE:
         if custom_loader is None:
             raise ValueError(
                 "custom_loader must be provided when reading configs from user custom file type"
@@ -100,27 +99,50 @@ def file_to_dict(
     else:
         # dead code just for completeness
         assert_type("dead code reached", None)
-        raise ValueError(f"Unsupported file type: {ext}")
+        raise ValueError(f"Unsupported file type: {filetype}")
+
+
+class FileNameInfo(NamedTuple):
+    name: str
+    ext: str
+
+
+def parse_file_name(file_name: str) -> FileNameInfo:
+    # is a path?
+    if os.path.sep in file_name:
+        raise ValueError(f"Invalid file name: {file_name}")
+
+    name, ext = os.path.splitext(file_name)
+    ext = ext[1:]
+
+    return FileNameInfo(name=name, ext=ext)
 
 
 def read_config(
     config_name: str,
     config_dir: str,
-    config_ext: SupportedExtension | str = "yaml",
+    config_type: SupportedFileType | str = "yaml",
     config_encoding: str = "utf-8",
     *,
     custom_loader: Callable[[str], dict[Any, Any]] | None = None,
     should_merge_example: bool = False,
 ) -> dict[Any, Any]:
-    file_ext = config_ext.lower()
-    real_config_path = os.path.join(config_dir, f"{config_name}.{file_ext}")
-    example_config_path = os.path.join(config_dir, f"{config_name}.example.{file_ext}")
+    real_config_path = os.path.join(config_dir, config_name)
+
+    config_file_name_info = parse_file_name(config_name)
+
+    example_config_name = ".".join(
+        [config_file_name_info.name, "example", config_file_name_info.ext]
+    )
+    example_config_path = os.path.join(config_dir, example_config_name)
 
     if not should_merge_example:
         with open(real_config_path, "r", encoding=config_encoding) as f:
-            if file_ext in _normalized_supported_extensions:
+            if config_type in _normalized_supported_file_types:
                 return file_to_dict(
-                    f, cast(_SupportedFileType, file_ext), custom_loader=custom_loader
+                    f,
+                    cast(_SupportedFileType, config_type),
+                    custom_loader=custom_loader,
                 )
             else:
                 return file_to_dict(
@@ -136,7 +158,7 @@ def read_config(
     try:
         with open(real_config_path, "r", encoding=config_encoding) as f:
             real_config = file_to_dict(
-                f, cast(_SupportedFileType, file_ext), custom_loader=custom_loader
+                f, cast(_SupportedFileType, config_type), custom_loader=custom_loader
             )
             real_config_exists = True
     except FileNotFoundError:
@@ -145,7 +167,7 @@ def read_config(
     try:
         with open(example_config_path, "r", encoding=config_encoding) as f:
             example_config = file_to_dict(
-                f, cast(_SupportedFileType, file_ext), custom_loader=custom_loader
+                f, cast(_SupportedFileType, config_type), custom_loader=custom_loader
             )
             example_config_exists = True
     except FileNotFoundError:
@@ -214,7 +236,7 @@ def _run_sync_in_background(func: Callable[[Unpack[U]], T], *args: Unpack[U]) ->
 class RunchConfigReader[C: RunchModel]:
     _config_name: str
     _config_dir: str
-    _config_ext: SupportedExtension | str
+    _config_type: SupportedFileType | str
     _config_encoding: str
 
     _config_schema: Type[C]
@@ -232,7 +254,7 @@ class RunchConfigReader[C: RunchModel]:
         self,
         config_name: str,
         config_dir: str = _RUNCH_DEFAULT_CONFIG_DIR,
-        config_ext: SupportedExtension | str = "yaml",
+        config_type: SupportedFileType | str = "yaml",
         config_encoding: str = "utf-8",
         *,
         custom_config_loader: Callable[[str], dict[Any, Any]] | None = None,
@@ -241,7 +263,7 @@ class RunchConfigReader[C: RunchModel]:
         self._config = None
         self._config_name = config_name
         self._config_dir = config_dir
-        self._config_ext = config_ext
+        self._config_type = config_type
         self._config_encoding = config_encoding
         self._config_schema = get_generic_arg_kv_map(get_orig_class(self))[C]
         self._custom_config_loader = custom_config_loader
@@ -265,7 +287,7 @@ class RunchConfigReader[C: RunchModel]:
         config = read_config(
             self._config_name,
             self._config_dir,
-            self._config_ext,
+            self._config_type,
             self._config_encoding,
             custom_loader=self._custom_config_loader,
             should_merge_example=self._features["merge_example"]["enabled"],
@@ -289,7 +311,7 @@ class RunchConfigReader[C: RunchModel]:
         raw_config = read_config(
             self._config_name,
             self._config_dir,
-            self._config_ext,
+            self._config_type,
             self._config_encoding,
             custom_loader=self._custom_config_loader,
             should_merge_example=self._features["merge_example"]["enabled"],
@@ -315,7 +337,7 @@ class RunchConfigReader[C: RunchModel]:
                 config = read_config(
                     that._config_name,
                     that._config_dir,
-                    that._config_ext,
+                    that._config_type,
                     that._config_encoding,
                     custom_loader=that._custom_config_loader,
                     should_merge_example=that._features["merge_example"]["enabled"],
