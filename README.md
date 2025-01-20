@@ -67,7 +67,7 @@ $ python -m runch <config_path> [config_ext]
 Manual:
 
 ```
-Usage: python -m runch <config_path> [config_ext]
+Usage: python -m runch <config_path> [config_name [config_ext]]
     Generate a model definition from a config file.
 
     config_path: path to your config file.
@@ -75,5 +75,6 @@ Usage: python -m runch <config_path> [config_ext]
 
     Example:
         python -m runch path/to/my_config.foo
-        python -m runch path/to/my_config.foo yaml
+        python -m runch path/to/my_config.foo chat_config
+        python -m runch path/to/my_config.foo chat_config yaml
 ```
