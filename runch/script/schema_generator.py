@@ -5,6 +5,7 @@ import json
 import yaml
 import tomllib
 
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -13,15 +14,17 @@ from datamodel_code_generator import DataModelType
 
 from typing import Any, Literal, NamedTuple, TextIO, cast
 
-__doc__ = """Usage: python -m runch <config_path> [config_ext]
+__doc__ = """Usage: python -m runch <config_path> [config_name [config_ext]]
     Generate a model definition from a config file.
   
     config_path: path to your config file.
+    config_name: controls generated variable name and class name.
     config_ext: content type of your config file. Default is `yaml`.
         
     Example:
         python -m runch path/to/my_config.foo
-        python -m runch path/to/my_config.foo yaml"""
+        python -m runch path/to/my_config.foo chat_config
+        python -m runch path/to/my_config.foo chat_config yaml"""
 
 
 def file_to_dict(
@@ -52,7 +55,8 @@ def file_to_dict(
         raise ValueError(f"Unsupported file type: {ext}")
 
 
-class FileNameInfo(NamedTuple):
+@dataclass
+class FileNameInfo:
     name: str
     ext: str
 
@@ -68,7 +72,7 @@ def parse_file_name(file_name: str) -> FileNameInfo:
     return FileNameInfo(name=name, ext=ext)
 
 
-def generate_model(config_path: str, config_ext: str):
+def generate_model(config_path: str, config_ext: str, config_name: str | None = None):
     file_ext = config_ext.lower()
 
     if file_ext not in ["yaml", "yml", "json", "toml"]:
@@ -122,7 +126,15 @@ def generate_model(config_path: str, config_ext: str):
     else:
         display_ext = ""
 
-    config_display_name = config_file_name_info.name + "{.example,}" + display_ext
+    if config_file_name_info.name.endswith(".example"):
+        config_file_base_name = config_file_name_info.name[:-8]
+    else:
+        config_file_base_name = config_file_name_info.name
+
+    if config_name is None:
+        config_name = config_file_base_name
+
+    config_display_name = config_file_base_name + "{.example,}" + display_ext
 
     header = f"# Generated from {config_display_name} by runch"
     header += "\n# Please be aware that `float` fields might be annotated as `int` due to the lack of type info in the config."
@@ -141,8 +153,8 @@ def generate_model(config_path: str, config_ext: str):
             custom_file_header=header,
             custom_formatters=["runch.script.custom_formatter"],
             custom_formatters_kwargs={
-                "config_file_name": config_file_name_info.name,
                 "config_file_ext": config_file_name_info.ext,
+                "config_name": config_name,
                 "config_path": config_path,
                 "config_type": file_ext,
             },
@@ -154,6 +166,7 @@ def generate_model(config_path: str, config_ext: str):
 
 
 if __name__ == "__main__":
+    # TODO: move to argparse
     if len(sys.argv) < 2:
         print(
             __doc__,
@@ -161,12 +174,21 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    config_name = sys.argv[1]
+    config_path = sys.argv[1]
+    config_name = None
+    config_ext = "yaml"
 
     if len(sys.argv) == 3:
-        config_ext = sys.argv[2]
-    else:
-        config_ext = "yaml"
+        config_name = sys.argv[2]
+    elif len(sys.argv) == 4:
+        config_name = sys.argv[2]
+        config_ext = sys.argv[3]
+    elif len(sys.argv) > 4:
+        print(
+            __doc__,
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
-    model = generate_model(config_name, config_ext)
+    model = generate_model(config_path, config_ext, config_name=config_name)
     print(model)

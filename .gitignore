@@ -7,7 +7,6 @@
 /tmp/
 
 etc/*.yaml
-!etc/*.example.yaml
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
