@@ -1,10 +1,12 @@
 import sys
+
 from runch.script.schema_generator import (
     generate_model,
     __doc__ as schema_generator_doc,
 )
+from runch._reader import _SupportedFileType
 
-print("??")
+from typing import cast
 
 if __name__ == "__main__":
     # TODO: move to argparse
@@ -18,13 +20,13 @@ if __name__ == "__main__":
 
     config_path = sys.argv[1]
     config_name = None
-    config_ext = "yaml"
+    config_ext: _SupportedFileType = "yaml"
 
     if len(sys.argv) == 3:
         config_name = sys.argv[2]
     elif len(sys.argv) == 4:
         config_name = sys.argv[2]
-        config_ext = sys.argv[3]
+        config_ext = cast(_SupportedFileType, sys.argv[3])
     elif len(sys.argv) > 4:
         print(
             __doc__,

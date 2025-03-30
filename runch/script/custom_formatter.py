@@ -169,7 +169,7 @@ class CodeFormatter(CustomCodeFormatter):
         )
         config_read_directive += (
             f"\n# _{self.config_name}_reader"
-            + '.set_feature("watch_file_update", {"enabled": True, "args": (10,)})'
+            + '.set_feature("watch_file_update", {"enabled": True, "args": {"update_interval": 10}})'
         )
 
         return f"{config_imports}\n\n{config_classes}\n\n{config_read_directive}"

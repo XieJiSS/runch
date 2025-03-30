@@ -151,6 +151,8 @@ class Runch[C: RunchModel](pydantic.RootModel[C]):
             **dumps_kwargs: Any,
         ) -> str: ...
 
+        to_json = toJSON
+
     else:
 
         def toJSON(self, *args: Any, **kwargs: Any) -> str:
@@ -159,12 +161,18 @@ class Runch[C: RunchModel](pydantic.RootModel[C]):
                 **kwargs,
             )
 
+        to_json = toJSON
+
     @classmethod
     def fromJSON(cls, json_str: str):
         type_ = cls.signature()
         return Runch[type_](from_json(json_str))
 
-    if not TYPE_CHECKING:
+    @classmethod
+    def from_json(cls, json_str: str):
+        return cls.fromJSON(json_str)
+
+    if TYPE_CHECKING:
 
         def toYAML(
             self,
@@ -184,6 +192,8 @@ class Runch[C: RunchModel](pydantic.RootModel[C]):
             **dumps_kwargs: Any,
         ) -> str: ...
 
+        to_yaml = toYAML
+
     else:
 
         def toYAML(
@@ -192,7 +202,6 @@ class Runch[C: RunchModel](pydantic.RootModel[C]):
             allow_unicode: bool = True,
             **kwargs: Any,
         ) -> str:
-
             return yaml.safe_dump(
                 data=self.toJSON(),
                 stream=None,  # make sure we return a string instead of None
@@ -201,10 +210,16 @@ class Runch[C: RunchModel](pydantic.RootModel[C]):
                 **kwargs,
             )
 
+        to_yaml = toYAML
+
     @classmethod
     def fromYAML(cls, yaml_str: str):
         type_ = cls.signature()
         return Runch[type_](yaml.safe_load(yaml_str))
+
+    @classmethod
+    def from_yaml(cls, yaml_str: str):
+        return cls.fromYAML(yaml_str)
 
     if TYPE_CHECKING:
 
@@ -225,10 +240,14 @@ class Runch[C: RunchModel](pydantic.RootModel[C]):
             **dumps_kwargs: Any,
         ) -> dict[str, Any]: ...
 
+        to_dict = toDict
+
     else:
 
         def toDict(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
             return self.config.model_dump(*args, **kwargs)
+
+        to_dict = toDict
 
     @classmethod
     def fromDict(
@@ -237,6 +256,10 @@ class Runch[C: RunchModel](pydantic.RootModel[C]):
     ):
         type_ = cls.signature()
         return Runch[type_](dict_obj)
+
+    @classmethod
+    def from_dict(cls, dict_obj: dict[Any, Any]):
+        return cls.fromDict(dict_obj)
 
     def update(self, new_runch: Runch[C]):
         """Update (replace) the current config with a new config."""
