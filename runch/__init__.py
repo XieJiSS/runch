@@ -1,9 +1,8 @@
 from runch._reader import (
-    RunchConfigReader,
     FeatureConfig,
+    RunchConfigReader,
+    RunchAsyncCustomConfigReader,
     require_lazy_runch_configs,
-    update_reader_default_feature,
-    set_reader_default_features,
 )
 from runch.runch import Runch, RunchModel
 
@@ -11,8 +10,7 @@ __all__ = [
     "Runch",
     "RunchModel",
     "RunchConfigReader",
+    "RunchAsyncCustomConfigReader",
     "FeatureConfig",
     "require_lazy_runch_configs",
-    "update_reader_default_feature",
-    "set_reader_default_features",
 ]

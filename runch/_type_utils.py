@@ -1,7 +1,16 @@
 import sys
 import typing
 
-from typing import Any, Generic, Type, TypeVar, get_args, get_origin
+from typing import (
+    Any,
+    Generic,
+    ParamSpec,
+    Type,
+    TypeVar,
+    TypeVarTuple,
+    get_args,
+    get_origin,
+)
 
 _typing_3_7 = False
 try:
@@ -40,7 +49,7 @@ def currentframe():
     raise ValueError("No frame information")
 
 
-def get_orig_class(obj: Any, default_to__class__: bool = False):
+def get_orig_class(obj: Any, default_to__class__: bool = False) -> Any:
     """adapted from pytypes.get_orig_class:
 
     Robust way to access `obj.__orig_class__`. Compared to a direct access this has the
@@ -98,9 +107,9 @@ def get_orig_class(obj: Any, default_to__class__: bool = False):
         raise
 
 
-def get_generic_arg_kv_map(type_: Type[T]) -> dict[TypeVar, Type[Any]]:
+def get_generic_arg_kv_map(type_: Type[T]) -> dict[TypeVar | TypeVarTuple, Type[Any]]:
     type_origin = get_origin(type_) or type_
-    generic_arg_kv_map: dict[TypeVar, Type[Any]] = {}
+    generic_arg_kv_map: dict[TypeVar | TypeVarTuple, Type[Any]] = {}
 
     # this check is equivalent to `_is_generic_type(type_)`
     if type_origin != type_:
@@ -116,9 +125,17 @@ def get_generic_arg_kv_map(type_: Type[T]) -> dict[TypeVar, Type[Any]]:
                 # class X[T, U]:
                 generic_arg_vars = type_origin.__type_params__
 
+            if len(generic_arg_vars) != len(generic_arg_types):
+                raise ValueError(
+                    f"get_generic_arg_kv_map: {type_origin=} is malformed, typevar arg count {len(generic_arg_vars)=} != provided arg count {len(generic_arg_types)=}"
+                )
+
             for i in range(len(generic_arg_vars)):
                 var = generic_arg_vars[i]
-                if not isinstance(var, TypeVar):
+                if isinstance(var, ParamSpec):
+                    # we don't include ParamSpec in the returned map
+                    continue
+                if not isinstance(var, TypeVar) and not isinstance(var, TypeVarTuple):
                     raise ValueError(
                         f"get_generic_arg_kv_map: {type_origin=} has non-TypeVar generic arg {var}"
                     )

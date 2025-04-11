@@ -19,20 +19,18 @@ from pydantic import ValidationError
 from .runch import Runch, RunchModel
 from ._type_utils import get_orig_class, get_generic_arg_kv_map
 
-from collections.abc import Callable, Mapping, MutableMapping
+from collections.abc import Callable, Coroutine, Mapping, MutableMapping
 from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
     NamedTuple,
     Self,
-    TextIO,
     Type,
     TypeVar,
     TypeAlias,
     TypeVarTuple,
     TypedDict,
-    Unpack,
     assert_type,
     cast,
     get_args,
@@ -40,7 +38,8 @@ from typing import (
 
 
 M = TypeVar("M", bound=RunchModel)
-FeatureKey: TypeAlias = Literal["watch_file_update", "merge_example"]
+FeatureKey: TypeAlias = Literal["watch_update", "merge_example"]
+AsyncFeatureKey: TypeAlias = Literal["watch_update"]
 SupportedFileType: TypeAlias = Literal["yaml", "json", "toml"]
 
 _UserCustomFileType: TypeAlias = Literal["_user_custom"]
@@ -224,44 +223,19 @@ def read_config(
 
 
 _CONFIG_READER_DEFAULT_FEATURES: dict[FeatureKey, FeatureConfig] = {
-    "watch_file_update": FeatureConfig(enabled=False, args={}),
+    "watch_update": FeatureConfig(enabled=False, args={}),
     "merge_example": FeatureConfig(enabled=False, args={}),
 }
 
-
-def update_reader_default_feature(
-    feature_name: FeatureKey, feature_config: FeatureConfig
-):
-    _CONFIG_READER_DEFAULT_FEATURES[feature_name] = feature_config
-
-
-def set_reader_default_features(features: dict[FeatureKey, FeatureConfig]):
-    valid_feature_keys = FeatureKey.__args__
-
-    _old_features = _CONFIG_READER_DEFAULT_FEATURES.copy()
-    _CONFIG_READER_DEFAULT_FEATURES.clear()
-    _CONFIG_READER_DEFAULT_FEATURES.update(features)
-
-    for key in valid_feature_keys:
-        if key not in _CONFIG_READER_DEFAULT_FEATURES:
-            # refuse invalid input and restore the old features
-            _CONFIG_READER_DEFAULT_FEATURES.clear()
-            _CONFIG_READER_DEFAULT_FEATURES.update(_old_features)
-            raise ValueError(f"Feature key {key} not in CONFIG_READER_DEFAULT_FEATURES")
-
-    for key in _CONFIG_READER_DEFAULT_FEATURES:
-        if key not in valid_feature_keys:
-            # refuse invalid input and restore the old features
-            _CONFIG_READER_DEFAULT_FEATURES.clear()
-            _CONFIG_READER_DEFAULT_FEATURES.update(_old_features)
-            raise ValueError(f"Feature key {key} is not recognized")
-
+_CUSTOM_A_CONFIG_READER_DEFAULT_FEATURES: dict[AsyncFeatureKey, FeatureConfig] = {
+    "watch_update": FeatureConfig(enabled=False, args={}),
+}
 
 T = TypeVar("T")
 U = TypeVarTuple("U")
 
 
-def _run_sync_in_background(func: Callable[[Unpack[U]], T], *args: Unpack[U]) -> None:
+def _run_sync_in_background(func: Callable[[*U], T], *args: *U) -> None:
     def thread_entry():
         func(*args)
 
@@ -280,7 +254,8 @@ class RunchConfigReader[C: RunchModel]:
     _config_version: bytes | None
     _config_updated_at: datetime | None
 
-    _custom_config_loader: Callable[[str], dict[Any, Any]] | None
+    _custom_config_parser: Callable[[str], dict[Any, Any]] | None
+
     _features: MutableMapping[FeatureKey, FeatureConfig]
     _auto_update_started: bool
 
@@ -295,7 +270,7 @@ class RunchConfigReader[C: RunchModel]:
         config_type: SupportedFileType | str = "yaml",
         config_encoding: str = "utf-8",
         *,
-        custom_config_loader: Callable[[str], dict[Any, Any]] | None = None,
+        custom_config_parser: Callable[[str], dict[Any, Any]] | None = None,
         features: Mapping[FeatureKey, FeatureConfig] | None = None,
     ):
         self._config = None
@@ -304,7 +279,7 @@ class RunchConfigReader[C: RunchModel]:
         self._config_type = config_type
         self._config_encoding = config_encoding
         self._config_schema = get_generic_arg_kv_map(get_orig_class(self))[C]
-        self._custom_config_loader = custom_config_loader
+        self._custom_config_parser = custom_config_parser
         self._features = {}
         self._auto_update_started = False
 
@@ -327,7 +302,7 @@ class RunchConfigReader[C: RunchModel]:
             self._config_dir,
             self._config_type,
             self._config_encoding,
-            custom_loader=self._custom_config_loader,
+            custom_loader=self._custom_config_parser,
             should_merge_example=self._features["merge_example"]["enabled"],
         )
 
@@ -343,9 +318,6 @@ class RunchConfigReader[C: RunchModel]:
         self._config_updated_at = datetime.now()
 
         return self._config
-
-    async def read_async(self) -> Runch[C]:
-        return await asyncify(self.read)()
 
     def update(
         self,
@@ -384,7 +356,7 @@ class RunchConfigReader[C: RunchModel]:
             self._config_dir,
             self._config_type,
             self._config_encoding,
-            custom_loader=self._custom_config_loader,
+            custom_loader=self._custom_config_parser,
             should_merge_example=self._features["merge_example"]["enabled"],
         )
 
@@ -393,6 +365,8 @@ class RunchConfigReader[C: RunchModel]:
         except ValidationError:
             if on_schema_error == "raise":
                 raise
+            else:
+                return
 
         if self._config_version != versioned_config.version:
             self._config.update(new_config)
@@ -418,7 +392,7 @@ class RunchConfigReader[C: RunchModel]:
                     that._config_dir,
                     that._config_type,
                     that._config_encoding,
-                    custom_loader=that._custom_config_loader,
+                    custom_loader=that._custom_config_parser,
                     should_merge_example=that._features["merge_example"]["enabled"],
                 )
 
@@ -446,12 +420,12 @@ class RunchConfigReader[C: RunchModel]:
               - args: The arguments for the feature
 
         ## Features
-        - feature="watch_file_update": Automatically update the config every `n` seconds. `n` should be passed as the only element in `FeatureConfig`'s `args`.
-        - feature="merge_example": Merge the example config with the actual config. This is useful for development. Should always pass empty tuple `()` as `args`.
+        - feature="watch_update": Automatically update the config every `n` seconds. `{"update_interval": n}` should be passed as the only element in `FeatureConfig`'s `args`.
+        - feature="merge_example": Merge the example config with the actual config. This is useful for development. Should always pass empty dict `{}` as `args`.
         """
         self._features[feature] = feature_config
 
-        if feature == "watch_file_update" and feature_config["enabled"]:
+        if feature == "watch_update" and feature_config["enabled"]:
             self._start_auto_update()
 
         return self
@@ -463,18 +437,14 @@ class RunchConfigReader[C: RunchModel]:
         return self.set_feature(feature, FeatureConfig(enabled=False, args={}))
 
     def _start_auto_update(self):
-        if not self._features["watch_file_update"]["enabled"]:
+        if not self._features["watch_update"]["enabled"]:
             return
 
-        if "update_interval" not in self._features["watch_file_update"]["args"]:
-            raise ValueError(
-                "watch_file_update feature requires `update_interval` in args"
-            )
+        if "update_interval" not in self._features["watch_update"]["args"]:
+            raise ValueError("watch_update feature requires `update_interval` in args")
 
-        if "on_schema_error" in self._features["watch_file_update"]["args"]:
-            on_schema_error = self._features["watch_file_update"]["args"][
-                "on_schema_error"
-            ]
+        if "on_schema_error" in self._features["watch_update"]["args"]:
+            on_schema_error = self._features["watch_update"]["args"]["on_schema_error"]
             if on_schema_error not in ["ignore", "raise"]:
                 raise ValueError('on_schema_error must be either "ignore" or "raise"')
         else:
@@ -503,10 +473,10 @@ class RunchConfigReader[C: RunchModel]:
                     break
 
                 await asyncio.sleep(
-                    self_._features["watch_file_update"]["args"]["update_interval"]
+                    self_._features["watch_update"]["args"]["update_interval"]
                 )
 
-                if not self_._features["watch_file_update"]["enabled"]:
+                if not self_._features["watch_update"]["enabled"]:
                     # auto update is turned off
                     break
 
@@ -529,10 +499,243 @@ class RunchConfigReader[C: RunchModel]:
         _run_sync_in_background(watchdog)
 
     def __del__(self):
-        self.set_feature("watch_file_update", FeatureConfig(enabled=False, args={}))
+        if not hasattr(self, "_features"):
+            # not initialized yet
+            return
+        self.set_feature("watch_update", FeatureConfig(enabled=False, args={}))
 
     def close(self):
-        self.__del__()
+        if not hasattr(self, "_features"):
+            # not initialized yet
+            return
+        self.set_feature("watch_update", FeatureConfig(enabled=False, args={}))
+
+
+class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
+    _config_name: str
+    _config_encoding: str
+
+    _config_schema: Type[C]
+    _config: Runch[C] | None
+    _config_updated_at: datetime | None
+
+    _config_loader: Callable[[str, *Ts], Coroutine[Any, Any, C]]
+    _config_loader_extra_args: tuple[*Ts]
+
+    _features: MutableMapping[AsyncFeatureKey, FeatureConfig]
+    _auto_update_started: bool
+
+    if TYPE_CHECKING:
+        # this attribute is defined on the Generic class, simply adding it here to avoid pyright error
+        __orig_class__: Type[RunchConfigReader[C]]
+
+    def __init__(
+        self,
+        config_name: str,
+        config_encoding: str = "utf-8",
+        *,
+        config_loader: Callable[[str, *Ts], Coroutine[Any, Any, C]],
+        config_loader_extra_args: tuple[*Ts] = (),
+        features: Mapping[AsyncFeatureKey, FeatureConfig] | None = None,
+    ):
+        orig_class: type[Any] = get_orig_class(self)
+        if len(get_args(orig_class)) < 2:
+            # RunchAsyncCustomConfigReader[C] -> RunchAsyncCustomConfigReader[C, ()]
+            orig_class = RunchAsyncCustomConfigReader[get_args(orig_class)[0], ()]
+
+        self._config = None
+        self._config_updated_at = None
+        self._config_name = config_name
+        self._config_encoding = config_encoding
+        self._config_schema = get_generic_arg_kv_map(orig_class)[C]
+        self._config_loader = config_loader
+        self._config_loader_extra_args = config_loader_extra_args
+        self._features = {}
+        self._auto_update_started = False
+
+        if features is not None:
+            for feature, value in features.items():
+                self.set_feature(feature, value)
+
+        # make sure _features is always fully initialized
+        for feature, value in _CUSTOM_A_CONFIG_READER_DEFAULT_FEATURES.items():
+            if feature not in self._features:
+                self.set_feature(feature, value)
+
+    async def read(self) -> Runch[C]:
+        if self._config is not None:
+            return self._config
+
+        type_ = self._config_schema
+
+        config = await self._config_loader(
+            self._config_name, *self._config_loader_extra_args
+        )
+
+        if (
+            self._config_updated_at is None
+            and self._features["watch_update"]["enabled"]
+            and not self._auto_update_started
+        ):
+            self._start_auto_update()
+
+        self._config = Runch[type_](config)
+        self._config_updated_at = datetime.now()
+
+        return self._config
+
+    async def update(
+        self,
+        *,
+        overwrite_uninitialized: bool = False,
+        on_schema_error: Literal["ignore", "raise"] = "ignore",
+    ):
+        """This function will try to update the config base on the latest config file.
+
+        Args:
+            overwrite_uninitialized (bool, optional): _If set to False, then update() will become a noop before read() is ever called. This can have side effects when used together with `read_lazy()`._
+            Defaults to `False`.
+
+            on_schema_error ("raise" | "ignore" , optional): _Specifies the behavior when a schema validation error occurs during an attempt to update this config._
+            Defaults to `"ignore"`, which means ignore the error and keep the old config.
+        """
+
+        if self._config is None:
+            if self._config_updated_at is not None:
+                raise RuntimeError(
+                    f"update: _config is None but _config_updated_at is not None. This is a bug."
+                )
+            if overwrite_uninitialized:
+                # force update even if the config is not initialized due to lazy load
+                try:
+                    await self.read()
+                except ValidationError:
+                    if on_schema_error == "raise":
+                        raise
+
+            return
+
+        type_ = self._config_schema
+
+        try:
+            new_config = Runch[type_](
+                await self._config_loader(
+                    self._config_name, *self._config_loader_extra_args
+                )
+            )
+        except ValidationError:
+            if on_schema_error == "raise":
+                raise
+            else:
+                return
+
+        self._config.update(new_config)
+        self._config_updated_at = datetime.now()
+
+    def set_feature(
+        self, feature: AsyncFeatureKey, feature_config: FeatureConfig
+    ) -> Self:
+        """Set a feature's configuration. See **Features** section for available features.
+
+        Args:
+            feature (AsyncFeatureKey): The feature's key
+            value (FeatureConfig): The feature's configuration.
+              - enabled: Whether the feature is enabled
+              - args: The arguments for the feature
+
+        ## Features
+        - feature="watch_update": Automatically update the config every `n` seconds. `{"update_interval": n}` should be passed as the only element in `FeatureConfig`'s `args`.
+        """
+        self._features[feature] = feature_config
+
+        if (
+            feature == "watch_update"
+            and feature_config["enabled"]
+            and self._config_updated_at is not None
+        ):
+            self._start_auto_update()
+
+        return self
+
+    def enable_feature(self, feature: AsyncFeatureKey, args: dict[str, Any]) -> Self:
+        return self.set_feature(feature, FeatureConfig(enabled=True, args=args))
+
+    def disable_feature(self, feature: AsyncFeatureKey) -> Self:
+        return self.set_feature(feature, FeatureConfig(enabled=False, args={}))
+
+    def _start_auto_update(self):
+        if not self._features["watch_update"]["enabled"]:
+            return
+
+        if "update_interval" not in self._features["watch_update"]["args"]:
+            raise ValueError("watch_update feature requires `update_interval` in args")
+
+        if "on_schema_error" in self._features["watch_update"]["args"]:
+            on_schema_error = self._features["watch_update"]["args"]["on_schema_error"]
+            if on_schema_error not in ["ignore", "raise"]:
+                raise ValueError('on_schema_error must be either "ignore" or "raise"')
+        else:
+            # will fallback to default later
+            on_schema_error = None
+
+        if self._auto_update_started:
+            return
+
+        self._auto_update_started = True
+
+        # use weakref to avoid circular reference to `self`
+        self_ref = weakref.ref(self)
+
+        # watchdog will stop automatically if the feature is disabled / the reader is deleted
+        async def a_watchdog():
+            # NOTE: under very rare circumstances, the auto update watchdog thread may not be able to be recreated.
+            # That is, if the user disables this feature, watchdog will quit in the next iteration. However, if the
+            # user enables the feature again between the `break` of `while True` and `self._auto_updating = False`,
+            # the new watchdog thread will not be created due to the `if self._auto_updating` check.
+            # This is a very very rare edge case and is not quite fixable without adding a lock and some complexity.
+            while True:
+                self_ = self_ref()
+                if self_ is None:
+                    # reader is deleted
+                    break
+
+                await asyncio.sleep(
+                    self_._features["watch_update"]["args"]["update_interval"]
+                )
+
+                if not self_._features["watch_update"]["enabled"]:
+                    # auto update is turned off
+                    break
+
+                if on_schema_error is not None:
+                    await self_.update(
+                        overwrite_uninitialized=False, on_schema_error=on_schema_error
+                    )
+                else:
+                    await self_.update(overwrite_uninitialized=False)
+
+                del self_
+
+            self_ = self_ref()
+            if self_ is not None:
+                self_._auto_update_started = False
+
+        def watchdog():
+            asyncio.run(a_watchdog())
+
+        _run_sync_in_background(watchdog)
+
+    def __del__(self):
+        if not hasattr(self, "_features"):
+            # not initialized yet
+            return
+        self.set_feature("watch_update", FeatureConfig(enabled=False, args={}))
+
+    def close(self):
+        if not hasattr(self, "_features"):
+            # not initialized yet
+            return
+        self.set_feature("watch_update", FeatureConfig(enabled=False, args={}))
 
 
 def require_lazy_runch_configs(*runches: Runch[Any]):

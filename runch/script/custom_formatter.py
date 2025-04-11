@@ -165,11 +165,11 @@ class CodeFormatter(CustomCodeFormatter):
             f"\n{self.config_name} = _{self.config_name}_reader.read_lazy()"
         )
         config_read_directive += (
-            "\n\n# uncomment the following line to enable the watch_file_update feature"
+            "\n\n# uncomment the following line to enable the watch_update feature"
         )
         config_read_directive += (
             f"\n# _{self.config_name}_reader"
-            + '.set_feature("watch_file_update", {"enabled": True, "args": {"update_interval": 10}})'
+            + '.set_feature("watch_update", {"enabled": True, "args": {"update_interval": 10}})'
         )
 
         return f"{config_imports}\n\n{config_classes}\n\n{config_read_directive}"

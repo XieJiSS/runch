@@ -265,3 +265,9 @@ class Runch[C: RunchModel](pydantic.RootModel[C]):
         """Update (replace) the current config with a new config."""
 
         self.config = new_runch.config
+
+    # @classmethod
+    # def from_model(cls, model: RunchModel):
+    #     """Create a new Runch instance from a pydantic model."""
+    #     type_ = cls.signature()
+    #     return Runch[type_](model.model_dump())
