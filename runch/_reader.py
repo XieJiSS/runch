@@ -281,6 +281,8 @@ class RunchConfigReader[C: RunchModel]:
         self._config_schema = get_generic_arg_kv_map(get_orig_class(self))[C]
         self._custom_config_parser = custom_config_parser
         self._features = {}
+        self._config_updated_at = None
+        self._config_version = None
         self._auto_update_started = False
 
         if features is not None:
