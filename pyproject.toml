@@ -3,10 +3,10 @@ authors = ["XieJiSS <panrz@deepseek.com>"]
 description = "Runch: refined munch. Attribute-style access for python dicts, with generic typing support. Help handle your configs, data, and more."
 license = "Apache-2.0"
 name = "runch"
-packages = [{include = "runch"}]
+packages = [{ include = "runch" }]
 readme = "README.md"
 repository = "https://github.com/XieJiSS/runch.git"
-version = "1.4.0"
+version = "1.5.0"
 
 [tool.poetry.dependencies]
 asyncer = "^0.0.8"
@@ -24,4 +24,4 @@ build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core"]
 
 [tool.pyright]
-typeCheckingMode = "basic"
+typeCheckingMode = "strict"

@@ -14,7 +14,41 @@ If you find any bugs, please submit an issue or a pull request at [GitHub](https
 
 ## Usage
 
-### Via Model Definition Generator
+### Example Config Model Definition:
+
+```bash
+$ python3 -m runch ./etc/base.yaml
+```
+
+```python
+# Generated from base{.example,}.yaml by runch
+# Please be aware that `float` fields might be annotated as `int` due to the lack of type info in the config.
+
+from __future__ import annotations
+
+from typing import List
+
+from pydantic import Field
+from runch import RunchModel, RunchConfigReader
+
+class BaseConfigModel(RunchModel):
+    host: str
+    port: str
+    user: str
+    password: str
+
+
+base_reader = RunchConfigReader[BaseConfigModel]("base.yaml", config_dir="./etc", config_type="yaml")
+base = base_reader.read()
+
+# example:
+print(base.config.host, base.config.port)  # with awesome intellicode support & runtime validation!
+
+# uncomment the following line to enable the watch_update feature
+# _base_reader.enable_feature("watch_update", {"update_interval": 10})
+```
+
+### Model Definition Generator
 
 ```bash
 $ python -m runch <config_path> [config_ext]
@@ -36,66 +70,9 @@ Usage: python -m runch <config_path> [config_name [config_ext]]
         python -m runch path/to/my_config.foo chat_config yaml
 ```
 
-Example of generated config reader:
-
-```bash
-$ python3 -m runch ./etc/base.yaml
-```
+### `RunchConfigReader` Arguments
 
 ```python
-# Generated from base{.example,}.yaml by runch
-# Please be aware that `float` fields might be annotated as `int` due to the lack of type info in the config.
-
-from __future__ import annotations
-
-from typing import List
-
-from pydantic import Field
-from runch import RunchModel, RunchConfigReader
-
-class BaseConfigModel(RunchModel):
-    db: DBConfig
-    services: List[ServiceConfig]
-
-class PostgresConfig(RunchModel):
-    host: str
-    port: str
-    user: str
-    password: str
-    name: str
-    pool_size: int
-    register_: int = Field(..., alias='register')
-
-
-class DBConfig(RunchModel):
-    postgres: PostgresConfig
-
-
-class ServiceConfig(RunchModel):
-    name: str
-    host: str
-    port: str
-    path: str
-
-_base_reader = RunchConfigReader[BaseConfigModel]("base.yaml", config_dir="./etc", config_type="yaml")
-base = _base_reader.read_lazy()
-
-# uncomment the following line to enable the watch_file_update feature
-# _base_reader.set_feature("watch_file_update", {"enabled": True, "args": {"update_interval": 10}})
-```
-
-### Write Config Manually
-
-```python
-from runch import RunchModel, RunchConfigReader
-
-class ExampleConfig(RunchModel):
-    db_host: str
-    db_port: int
-    db_user: str
-    db_password: str
-    db_name: str
-
 # Read config from file.                 ↓ square brackets
 example_config_reader = RunchConfigReader[ExampleConfig](
                                         # ^^^^^^^^^^^^^ Config model class name
@@ -106,7 +83,7 @@ example_config_reader = RunchConfigReader[ExampleConfig](
 )
 example_config = example_config_reader.read()  # Or .read_lazy() for lazy loading
 
-print(example_config.config.db_host)    # with awesome intellicode support & runtime validation!
+print(example_config.config.db_host)
 ```
 
 ```bash
@@ -126,12 +103,52 @@ db_name: database
 - YAML
 - JSON
 - TOML
-- arbitrary file formats with custom reader, specified via the `custom_config_loader` param of `RunchConfigReader.__init__()`. The custom reader should be a function that takes a `str`-type file content as its first argument, and returns a dictionary.
+- arbitrary file formats with custom parser, specified via the `custom_config_parser` param of `RunchConfigReader.__init__()`. The custom parser should be a function that takes a `str`-type file content as its first argument, and returns a parsed dictionary.
+
+## Use Remote Config Source
+
+```python
+from httpx import AsyncClient
+from runch import (
+    RunchModel,
+    RunchAsyncCustomConfigReader,
+)
+
+
+class TestConfig(RunchModel):
+    status: str
+    method: str
+
+
+async def example_config_loader(config_name: str) -> TestConfig:
+    """Load config from a remote source."""
+
+    print(f"Loading config from remote source for {config_name=}...")
+
+    # Simulate a network request to fetch the config.
+    async with AsyncClient() as client:
+        response = await client.get(
+            f"https://dummyjson.com/test",
+            headers=headers,
+        )
+        response.raise_for_status()
+
+    return TestConfig(**response.json())
+
+
+test_reader = RunchAsyncCustomConfigReader[TestConfig](
+    config_name="example",
+    config_loader=example_config_loader,
+)
+
+async def main():
+    test_config = await test_reader.read()
+    print(test_config.config.status)
+```
 
 ## Other Features
 
 - configurable auto sync & update.
 - optional lazy load & evaluate. Useful for optional configs that may not exist.
 - configurable example merging for fast local development.
-- read arbitrary file formats from any places (e.g. network, db) with custom reader.
-  - Note: custom readers are sync functions. We highly recommend avoid combining lazy loading via `read_lazy()` & fetching configs from network / db, because this may block the main thread at runtime. Use `read()` instead so that the program won't get blocked after the initialization phase.
+- read arbitrary file formats from any places (e.g. disk, network, db) with sync reader + custom config parser / async reader + custom config loader.
