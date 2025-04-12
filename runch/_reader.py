@@ -10,7 +10,6 @@ import weakref
 import yaml
 import mergedeep
 
-from asyncer import asyncify
 from datetime import datetime
 from hashlib import blake2b
 from io import StringIO
