@@ -176,3 +176,21 @@ test_reader = RunchConfigReader[TestConfig](
 if os.environ.get("SERVE_MODE") != "prod":
     test_reader.enable_feature("merge_example", {})
 ```
+
+### User-Defined Custom Config Validation Logic
+
+Note that this is different from the custom config loader feature.
+
+```python
+from runch import RunchModel, RunchConfigReader
+
+class CustomConfigModel(RunchModel):
+    host: str
+    port: int
+
+    def __init__(self, *args: Any, **kw: Any):
+        super().__init__(*args, **kw)
+
+        if self.port % 2 == 0:
+            raise ValueError("Only odd port numbers are accepted")
+```
