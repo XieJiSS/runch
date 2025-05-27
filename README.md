@@ -152,3 +152,27 @@ async def main():
 - optional lazy load & evaluate. Useful for optional configs that may not exist.
 - configurable example merging for fast local development.
 - read arbitrary file formats from any places (e.g. disk, network, db) with sync reader + custom config parser / async reader + custom config loader.
+
+### Auto Update
+
+```python
+test_reader.enable_feature("watch_update", {"update_interval": 2})  # update every 2s
+test_reader.enable_feature(
+    "watch_update",
+    {
+        "update_interval": 2.5,  # update every 2.5s
+        "on_update_error": "ignore"  # ignore or raise. default=ignore
+    }
+)
+```
+
+### Merge Example Yaml for Local Dev
+
+```python
+test_reader = RunchConfigReader[TestConfig](
+    config_name="test.yaml",
+    config_type="yaml",
+)
+if os.environ.get("SERVE_MODE") != "prod":
+    test_reader.enable_feature("merge_example", {})
+```

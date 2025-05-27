@@ -13,7 +13,6 @@ import mergedeep
 from datetime import datetime
 from hashlib import blake2b
 from io import StringIO
-from pydantic import ValidationError
 
 from .runch import Runch, RunchModel
 from ._type_utils import get_orig_class, get_generic_arg_kv_map
@@ -324,7 +323,7 @@ class RunchConfigReader[C: RunchModel]:
         self,
         *,
         overwrite_uninitialized: bool = False,
-        on_schema_error: Literal["ignore", "raise"] = "ignore",
+        on_error: Literal["ignore", "raise"] = "ignore",
     ):
         """This function will try to update the config base on the latest config file.
 
@@ -332,21 +331,21 @@ class RunchConfigReader[C: RunchModel]:
             overwrite_uninitialized (bool, optional): _If set to False, then update() will become a noop before read() is ever called. This can have side effects when used together with `read_lazy()`._
             Defaults to `False`.
 
-            on_schema_error ("raise" | "ignore" , optional): _Specifies the behavior when a schema validation error occurs during an attempt to update this config._
+            on_error ("raise" | "ignore" , optional): _Specifies the behavior when errors occurred during an attempt to update this config._
             Defaults to `"ignore"`, which means ignore the error and keep the old config.
         """
 
         if self._config is None:
             if self._config_updated_at is not None:
                 raise RuntimeError(
-                    f"update: _config is None but _config_updated_at is not None. This is a bug."
+                    "update: _config is None but _config_updated_at is not None. This is a bug."
                 )
             if overwrite_uninitialized:
                 # force update even if the config is not initialized due to lazy load
                 try:
                     self.read()
-                except ValidationError:
-                    if on_schema_error == "raise":
+                except Exception:
+                    if on_error == "raise":
                         raise
 
             return
@@ -363,8 +362,8 @@ class RunchConfigReader[C: RunchModel]:
 
         try:
             new_config = Runch[type_].fromDict(versioned_config.config)
-        except ValidationError:
-            if on_schema_error == "raise":
+        except Exception:
+            if on_error == "raise":
                 raise
             else:
                 return
@@ -421,8 +420,10 @@ class RunchConfigReader[C: RunchModel]:
               - args: The arguments for the feature
 
         ## Features
-        - feature="watch_update": Automatically update the config every `n` seconds. `{"update_interval": n}` should be passed as the only element in `FeatureConfig`'s `args`.
-        - feature="merge_example": Merge the example config with the actual config. This is useful for development. Should always pass empty dict `{}` as `args`.
+        - feature="watch_update": Automatically update the config every `n` seconds.
+            - args: `{"update_interval": n, "on_update_error": "ignore" | "raise"}`, where `update_interval` is always required.
+        - feature="merge_example": Merge the example config with the actual config. This is useful for development.
+            - args: `{}`.
         """
         self._features[feature] = feature_config
 
@@ -444,13 +445,13 @@ class RunchConfigReader[C: RunchModel]:
         if "update_interval" not in self._features["watch_update"]["args"]:
             raise ValueError("watch_update feature requires `update_interval` in args")
 
-        if "on_schema_error" in self._features["watch_update"]["args"]:
-            on_schema_error = self._features["watch_update"]["args"]["on_schema_error"]
-            if on_schema_error not in ["ignore", "raise"]:
-                raise ValueError('on_schema_error must be either "ignore" or "raise"')
+        if "on_update_error" in self._features["watch_update"]["args"]:
+            on_update_error = self._features["watch_update"]["args"]["on_update_error"]
+            if on_update_error not in ["ignore", "raise"]:
+                raise ValueError('on_update_error must be either "ignore" or "raise"')
         else:
             # will fallback to default later
-            on_schema_error = None
+            on_update_error = None
 
         if self._auto_update_started:
             return
@@ -481,9 +482,9 @@ class RunchConfigReader[C: RunchModel]:
                     # auto update is turned off
                     break
 
-                if on_schema_error is not None:
+                if on_update_error is not None:
                     self_.update(
-                        overwrite_uninitialized=False, on_schema_error=on_schema_error
+                        overwrite_uninitialized=False, on_error=on_update_error
                     )
                 else:
                     self_.update(overwrite_uninitialized=False)
@@ -589,7 +590,7 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
         self,
         *,
         overwrite_uninitialized: bool = False,
-        on_schema_error: Literal["ignore", "raise"] = "ignore",
+        on_error: Literal["ignore", "raise"] = "ignore",
     ):
         """This function will try to update the config base on the latest config file.
 
@@ -597,21 +598,21 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
             overwrite_uninitialized (bool, optional): _If set to False, then update() will become a noop before read() is ever called. This can have side effects when used together with `read_lazy()`._
             Defaults to `False`.
 
-            on_schema_error ("raise" | "ignore" , optional): _Specifies the behavior when a schema validation error occurs during an attempt to update this config._
+            on_error ("raise" | "ignore", optional): _Specifies the behavior when errors occurred during an attempt to update this config._
             Defaults to `"ignore"`, which means ignore the error and keep the old config.
         """
 
         if self._config is None:
             if self._config_updated_at is not None:
                 raise RuntimeError(
-                    f"update: _config is None but _config_updated_at is not None. This is a bug."
+                    "update: _config is None but _config_updated_at is not None. This is a bug."
                 )
             if overwrite_uninitialized:
                 # force update even if the config is not initialized due to lazy load
                 try:
                     await self.read()
-                except ValidationError:
-                    if on_schema_error == "raise":
+                except Exception:
+                    if on_error == "raise":
                         raise
 
             return
@@ -624,8 +625,8 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
                     self._config_name, *self._config_loader_extra_args
                 )
             )
-        except ValidationError:
-            if on_schema_error == "raise":
+        except Exception:
+            if on_error == "raise":
                 raise
             else:
                 return
@@ -645,7 +646,8 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
               - args: The arguments for the feature
 
         ## Features
-        - feature="watch_update": Automatically update the config every `n` seconds. `{"update_interval": n}` should be passed as the only element in `FeatureConfig`'s `args`.
+        - feature="watch_update": Automatically update the config every `n` seconds.
+            - args: `{"update_interval": n, "on_update_error": "ignore" | "raise"}`, where `update_interval` is always required.
         """
         self._features[feature] = feature_config
 
@@ -671,13 +673,13 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
         if "update_interval" not in self._features["watch_update"]["args"]:
             raise ValueError("watch_update feature requires `update_interval` in args")
 
-        if "on_schema_error" in self._features["watch_update"]["args"]:
-            on_schema_error = self._features["watch_update"]["args"]["on_schema_error"]
-            if on_schema_error not in ["ignore", "raise"]:
-                raise ValueError('on_schema_error must be either "ignore" or "raise"')
+        if "on_update_error" in self._features["watch_update"]["args"]:
+            on_update_error = self._features["watch_update"]["args"]["on_update_error"]
+            if on_update_error not in ["ignore", "raise"]:
+                raise ValueError('on_update_error must be either "ignore" or "raise"')
         else:
             # will fallback to default later
-            on_schema_error = None
+            on_update_error = None
 
         if self._auto_update_started:
             return
@@ -708,9 +710,9 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
                     # auto update is turned off
                     break
 
-                if on_schema_error is not None:
+                if on_update_error is not None:
                     await self_.update(
-                        overwrite_uninitialized=False, on_schema_error=on_schema_error
+                        overwrite_uninitialized=False, on_error=on_update_error
                     )
                 else:
                     await self_.update(overwrite_uninitialized=False)

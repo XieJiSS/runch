@@ -26,12 +26,12 @@ async def config_loader(config_name: str, auth: str | None = None) -> TestConfig
     async with AsyncClient() as client:
         if random.random() < 0.5:
             response = await client.get(
-                f"https://dummyjson.com/test",
+                "https://dummyjson.com/test",
                 headers=headers,
             )
         else:
             response = await client.post(
-                f"https://dummyjson.com/test",
+                "https://dummyjson.com/test",
                 headers=headers,
             )
 
