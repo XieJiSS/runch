@@ -49,6 +49,15 @@ class RunchModel(pydantic.BaseModel):
             return default
 
 
+class RunchStrictModel(RunchModel):
+    model_config = pydantic.ConfigDict(
+        extra="forbid",
+        strict=True,
+        protected_namespaces=(),
+        use_enum_values=True,
+    )
+
+
 class Runch[C: RunchModel](pydantic.RootModel[C]):
     """Runch Config Class
 
