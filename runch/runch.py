@@ -57,6 +57,9 @@ class RunchStrictModel(RunchModel):
         use_enum_values=True,
     )
 
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
 
 class Runch[C: RunchModel](pydantic.RootModel[C]):
     """Runch Config Class
