@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import enum
+import logging
 import yaml
 import pydantic
 
@@ -10,6 +12,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
+    Protocol,
     Type,
     TypeAlias,
     TypeVar,
@@ -61,6 +64,27 @@ class RunchStrictModel(RunchModel):
         super().__init__(*args, **kwargs)
 
 
+class RunchLogLevel(enum.IntEnum):
+    DEBUG = logging.DEBUG
+    INFO = logging.INFO
+    WARNING = logging.WARNING
+    ERROR = logging.ERROR
+    CRITICAL = logging.CRITICAL
+
+
+class RunchCompatibleLogger(Protocol):
+
+    def log(
+        self,
+        level: RunchLogLevel,
+        msg: str,
+        /,
+        *,
+        exc_info: BaseException | None = None,
+        **kwargs: Any,
+    ) -> None: ...
+
+
 class Runch[C: RunchModel](pydantic.RootModel[C]):
     """Runch Config Class
 
@@ -91,9 +115,16 @@ class Runch[C: RunchModel](pydantic.RootModel[C]):
     def __init__(self, *args: Any, **kwargs: Any):
         self.__init_args = args
         self.__init_kwargs = kwargs
+        self.__logger = None
         super().__init__(  # pyright: ignore[reportUnknownMemberType]
             *self.__init_args, **self.__init_kwargs
         )
+
+    def _runch_get_logger(self) -> RunchCompatibleLogger | None:
+        return self.__logger
+
+    def _runch_set_logger(self, value: RunchCompatibleLogger | None) -> None:
+        self.__logger = value
 
     @property
     def config(self) -> C:

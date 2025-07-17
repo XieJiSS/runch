@@ -14,7 +14,7 @@ from datetime import datetime
 from hashlib import blake2b
 from io import StringIO
 
-from .runch import Runch, RunchModel
+from .runch import Runch, RunchModel, RunchCompatibleLogger, RunchLogLevel
 from ._type_utils import get_orig_class, get_generic_arg_kv_map
 
 from collections.abc import Callable, Coroutine, Mapping, MutableMapping
@@ -252,6 +252,8 @@ class RunchConfigReader[C: RunchModel]:
     _config_version: bytes | None
     _config_updated_at: datetime | None
 
+    _config_logger: RunchCompatibleLogger | None
+
     _custom_config_parser: Callable[[str], dict[Any, Any]] | None
 
     _features: MutableMapping[FeatureKey, FeatureConfig]
@@ -269,6 +271,7 @@ class RunchConfigReader[C: RunchModel]:
         config_encoding: str = "utf-8",
         *,
         custom_config_parser: Callable[[str], dict[Any, Any]] | None = None,
+        logger: RunchCompatibleLogger | None = None,
         features: Mapping[FeatureKey, FeatureConfig] | None = None,
     ):
         self._config = None
@@ -281,6 +284,7 @@ class RunchConfigReader[C: RunchModel]:
         self._features = {}
         self._config_updated_at = None
         self._config_version = None
+        self._config_logger = logger
         self._auto_update_started = False
 
         if features is not None:
@@ -316,6 +320,7 @@ class RunchConfigReader[C: RunchModel]:
         self._config = Runch[type_].fromDict(versioned_config.config)
         self._config_version = versioned_config.version
         self._config_updated_at = datetime.now()
+        self._config._runch_set_logger(self._config_logger)
 
         return self._config
 
@@ -362,7 +367,13 @@ class RunchConfigReader[C: RunchModel]:
 
         try:
             new_config = Runch[type_].fromDict(versioned_config.config)
-        except Exception:
+        except Exception as e:
+            if (logger := self._config._runch_get_logger()) is not None:
+                logger.log(
+                    RunchLogLevel.ERROR,
+                    "RunchConfigReader: config update failed",
+                    exc_info=e,
+                )
             if on_error == "raise":
                 raise
             else:
@@ -400,6 +411,7 @@ class RunchConfigReader[C: RunchModel]:
                 that._config = Runch[type_].fromDict(versioned_config.config)
                 that._config_version = versioned_config.version
                 that._config_updated_at = datetime.now()
+                that._config._runch_set_logger(that._config_logger)
 
                 return that._config.__getattribute__(name)
 
@@ -625,7 +637,13 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
                     self._config_name, *self._config_loader_extra_args
                 )
             )
-        except Exception:
+        except Exception as e:
+            if (logger := self._config._runch_get_logger()) is not None:
+                logger.log(
+                    RunchLogLevel.ERROR,
+                    "RunchAsyncCustomConfigReader: config update failed",
+                    exc_info=e,
+                )
             if on_error == "raise":
                 raise
             else:

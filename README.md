@@ -54,7 +54,7 @@ print(base.config.host, base.config.port)  # with awesome intellicode support & 
 $ python -m runch <config_path> [config_ext]
 ```
 
-Manual:
+Usage:
 
 ```
 Usage: python -m runch <config_path> [config_name [config_ext]]
@@ -78,8 +78,9 @@ example_config_reader = RunchConfigReader[ExampleConfig](
                                         # ^^^^^^^^^^^^^ Config model class name
     config_name="config_file_name",     # with file extension, but don't include the ".example" part
     config_dir="config_dir",            # default is os.environ.get("RUNCH_CONFIG_DIR", "./etc")
-    config_type="yaml"                  # default is "yaml"
-    config_encoding="utf-8"             # default is "utf-8"
+    config_type="yaml",                 # default is "yaml"
+    config_encoding="utf-8",            # default is "utf-8"
+    config_logger=getLogger("example"), # default is None
 )
 example_config = example_config_reader.read()  # Or .read_lazy() for lazy loading
 

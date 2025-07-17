@@ -4,7 +4,13 @@ from runch._reader import (
     RunchAsyncCustomConfigReader,
     require_lazy_runch_configs,
 )
-from runch.runch import Runch, RunchModel, RunchStrictModel
+from runch.runch import (
+    Runch,
+    RunchModel,
+    RunchStrictModel,
+    RunchCompatibleLogger,
+    RunchLogLevel,
+)
 
 __all__ = [
     "Runch",
@@ -12,6 +18,8 @@ __all__ = [
     "RunchStrictModel",
     "RunchConfigReader",
     "RunchAsyncCustomConfigReader",
+    "RunchCompatibleLogger",
+    "RunchLogLevel",
     "FeatureConfig",
     "require_lazy_runch_configs",
 ]
