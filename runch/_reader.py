@@ -14,6 +14,8 @@ from datetime import datetime
 from hashlib import blake2b
 from io import StringIO
 
+from runch.exceptions import RunchConfigUnchanged
+
 from .runch import Runch, RunchModel, RunchCompatibleLogger, RunchLogLevel
 from ._type_utils import get_orig_class, get_generic_arg_kv_map
 
@@ -525,7 +527,7 @@ class RunchConfigReader[C: RunchModel]:
         self.set_feature("watch_update", FeatureConfig(enabled=False, args={}))
 
 
-class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
+class RunchAsyncCustomConfigReader[C: RunchModel]:
     _config_name: str
     _config_encoding: str
 
@@ -533,8 +535,7 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
     _config: Runch[C] | None
     _config_updated_at: datetime | None
 
-    _config_loader: Callable[[str, *Ts], Coroutine[Any, Any, C]]
-    _config_loader_extra_args: tuple[*Ts]
+    _config_loader: Callable[[str], Coroutine[Any, Any, C]]
 
     _features: MutableMapping[AsyncFeatureKey, FeatureConfig]
     _auto_update_started: bool
@@ -548,14 +549,10 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
         config_name: str,
         config_encoding: str = "utf-8",
         *,
-        config_loader: Callable[[str, *Ts], Coroutine[Any, Any, C]],
-        config_loader_extra_args: tuple[*Ts] = (),
+        config_loader: Callable[[str], Coroutine[Any, Any, C]],
         features: Mapping[AsyncFeatureKey, FeatureConfig] | None = None,
     ):
         orig_class: type[Any] = get_orig_class(self)
-        if len(get_args(orig_class)) < 2:
-            # RunchAsyncCustomConfigReader[C] -> RunchAsyncCustomConfigReader[C, ()]
-            orig_class = RunchAsyncCustomConfigReader[get_args(orig_class)[0], ()]
 
         self._config = None
         self._config_updated_at = None
@@ -563,7 +560,6 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
         self._config_encoding = config_encoding
         self._config_schema = get_generic_arg_kv_map(orig_class)[C]
         self._config_loader = config_loader
-        self._config_loader_extra_args = config_loader_extra_args
         self._features = {}
         self._auto_update_started = False
 
@@ -582,9 +578,7 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
 
         type_ = self._config_schema
 
-        config = await self._config_loader(
-            self._config_name, *self._config_loader_extra_args
-        )
+        config = await self._config_loader(self._config_name)
 
         if (
             self._config_updated_at is None
@@ -632,11 +626,9 @@ class RunchAsyncCustomConfigReader[C: RunchModel, *Ts]:
         type_ = self._config_schema
 
         try:
-            new_config = Runch[type_](
-                await self._config_loader(
-                    self._config_name, *self._config_loader_extra_args
-                )
-            )
+            new_config = Runch[type_](await self._config_loader(self._config_name))
+        except RunchConfigUnchanged:
+            return
         except Exception as e:
             if (logger := self._config._runch_get_logger()) is not None:
                 logger.log(

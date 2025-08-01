@@ -147,6 +147,8 @@ async def main():
     print(test_config.config.status)
 ```
 
+Note that you can raise `runch.exceptions.RunchConfigUnchanged` inside custom config loaders to prevent unnecessary config reloads / updates.
+
 ## Other Features
 
 - configurable auto sync & update.

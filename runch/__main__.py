@@ -4,7 +4,7 @@ from runch.script.schema_generator import (
     generate_model,
     __doc__ as schema_generator_doc,
 )
-from runch._reader import _SupportedFileType
+from runch._reader import _SupportedFileType  # pyright: ignore[reportPrivateUsage]
 
 from typing import cast
 

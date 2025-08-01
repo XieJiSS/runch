@@ -1,4 +1,5 @@
 import asyncio
+import os
 import random
 
 from httpx import AsyncClient
@@ -14,12 +15,15 @@ class TestConfig(RunchModel):
     method: str
 
 
-async def config_loader(config_name: str, auth: str | None = None) -> TestConfig:
+TEST_AUTH_KEY = os.environ.get("TEST_AUTH_KEY", "sk-example_secret_auth_key")
+
+
+async def config_loader(config_name: str) -> TestConfig:
     """Load config from a remote source."""
 
     print(f"Loading config from remote source for {config_name=}...")
 
-    headers = {"Authorization": f"Bearer {auth}"}
+    headers = {"Authorization": f"Bearer {TEST_AUTH_KEY}"}
 
     # Simulate a network request to fetch the config.
 
@@ -45,10 +49,9 @@ test_reader_1 = RunchAsyncCustomConfigReader[TestConfig](
     config_loader=config_loader,
 )
 
-test_reader_2 = RunchAsyncCustomConfigReader[TestConfig, *tuple[str]](
+test_reader_2 = RunchAsyncCustomConfigReader[TestConfig](
     config_name="example2",
     config_loader=config_loader,
-    config_loader_extra_args=("sk-example_secret_auth_key",),
 )
 
 test_reader_1.enable_feature("watch_update", {"update_interval": 2})

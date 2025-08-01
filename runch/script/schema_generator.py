@@ -1,7 +1,7 @@
 import re
 import os
 import sys
-import mergedeep
+import mergedeep # pyright: ignore[reportMissingTypeStubs]
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,9 +10,9 @@ from tempfile import TemporaryDirectory
 from datamodel_code_generator import InputFileType, generate
 from datamodel_code_generator import DataModelType
 
-from runch._reader import str_to_dict, _SupportedFileType
+from runch._reader import str_to_dict, _SupportedFileType # pyright: ignore[reportPrivateUsage]
 
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 __doc__ = """Usage: python -m runch <config_path> [config_name [config_ext]]
     Generate a model definition from a config file.

@@ -88,7 +88,7 @@ class CodeFormatter(CustomCodeFormatter):
             pydantic_import = None
 
         new_imports = [
-            f"from runch import RunchModel, RunchConfigReader",
+            "from runch import RunchModel, RunchConfigReader",
             CONFIG_BODY_IDENT,
         ]
 
@@ -134,7 +134,7 @@ class CodeFormatter(CustomCodeFormatter):
                     )[0]
                     schema_dedup_id = _schema_dedup_id
                     class_name_splitted[-1] = class_name_splitted[-1].replace(
-                        _schema_dedup_id, f""
+                        _schema_dedup_id, ""
                     )
 
                 new_class_name = "".join(class_name_splitted)
@@ -160,9 +160,9 @@ class CodeFormatter(CustomCodeFormatter):
         config_file_fullname = os.path.basename(self.config_path)
         config_file_path = os.path.dirname(self.config_path)
 
-        config_read_directive = f'_{self.config_name}_reader = RunchConfigReader[{config_class_name}ConfigModel]("{config_file_fullname}", config_dir="{config_file_path}", config_type="{self.config_type}")'
+        config_read_directive = f'_{self.config_name}_reader = RunchConfigReader[{config_class_name}ConfigModel](config_name="{config_file_fullname}", config_dir="{config_file_path}", config_type="{self.config_type}")'
         config_read_directive += (
-            f"\n{self.config_name} = _{self.config_name}_reader.read_lazy()"
+            f"\n{self.config_name} = _{self.config_name}_reader.read()"
         )
         config_read_directive += (
             "\n\n# uncomment the following line to enable the watch_update feature"
