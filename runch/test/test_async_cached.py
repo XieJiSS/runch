@@ -80,9 +80,11 @@ async def main():
         exc = e
     assert isinstance(exc, RunchLookupError)
 
+    config = await test_cached_reader.read()
+
     while True:
-        config = await test_cached_reader.read()
-        assert test_cached_reader.read_cached() == config
+        assert test_cached_reader.read_cached() == await test_cached_reader.read()
+        print(f"{config.config!r}")
         await asyncio.sleep(2)
 
 
