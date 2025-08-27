@@ -5,3 +5,9 @@ class RunchConfigUnchanged(Exception):
 
     def __init__(self):
         super().__init__()
+
+
+class RunchLookupError(Exception):
+    """
+    Raised when calling read_cached() on async configs, but the value is not ready yet.
+    """

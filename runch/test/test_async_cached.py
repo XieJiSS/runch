@@ -7,7 +7,7 @@ from runch import (
     RunchModel,
     RunchAsyncCustomConfigReader,
 )
-from runch.exceptions import RunchConfigUnchanged
+from runch.exceptions import RunchConfigUnchanged, RunchLookupError
 
 cached_version_num_map: dict[str, str] = {}
 
@@ -52,13 +52,13 @@ async def config_loader_with_cache(
     # This is just a demonstration. In a real-world scenario, you would like to store & compare ETags obtained via
     # a HEAD request to avoid unnecessary network traffics.
 
-    config = RemoteConfig(**response.json())
-    if config.version != cached_version_num_map[config_name]:
+    new_config = RemoteConfig(**response.json())
+    if new_config.version != cached_version_num_map[config_name]:
         print(
-            f"Config updated from {cached_version_num_map[config_name]} to {config.version}"
+            f"Config updated from {cached_version_num_map[config_name]} to {new_config.version}"
         )
-        cached_version_num_map[config_name] = config.version
-        return config
+        cached_version_num_map[config_name] = new_config.version
+        return new_config
     else:
         print("Config unchanged, skipping update")
         raise RunchConfigUnchanged()
@@ -73,9 +73,16 @@ test_cached_reader.enable_feature("watch_update", {"update_interval": 2})
 
 
 async def main():
-    _ = await test_cached_reader.read()
+    try:
+        test_cached_reader.read_cached()
+        exc = None
+    except Exception as e:
+        exc = e
+    assert isinstance(exc, RunchLookupError)
 
     while True:
+        config = await test_cached_reader.read()
+        assert test_cached_reader.read_cached() == config
         await asyncio.sleep(2)
 
 

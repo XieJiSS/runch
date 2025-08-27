@@ -145,6 +145,9 @@ test_reader = RunchAsyncCustomConfigReader[TestConfig](
 async def main():
     test_config = await test_reader.read()
     print(test_config.config.status)
+
+    # read_cached() does not require `await`, but it raises RunchLookupError if there's no prior sucessful call to `read()`
+    print(test_config, test_reader.read_cached())
 ```
 
 Note that you can raise `runch.exceptions.RunchConfigUnchanged` inside custom config loaders to prevent unnecessary config reloads / updates.

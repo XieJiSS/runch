@@ -14,7 +14,7 @@ from datetime import datetime
 from hashlib import blake2b
 from io import StringIO
 
-from runch.exceptions import RunchConfigUnchanged
+from runch.exceptions import RunchConfigUnchanged, RunchLookupError
 
 from .runch import Runch, RunchModel, RunchCompatibleLogger, RunchLogLevel
 from ._type_utils import get_orig_class, get_generic_arg_kv_map
@@ -591,6 +591,23 @@ class RunchAsyncCustomConfigReader[C: RunchModel]:
         self._config_updated_at = datetime.now()
 
         return self._config
+
+    def read_cached(self) -> Runch[C]:
+        """
+        Return the cached config value. If no cached value exists, raise an exception.
+
+        Raises:
+            RunchLookupError: The config is not initialized yet.
+
+        Returns:
+            Runch[C: RunchModel]: The cached config value returned by the most recent successful call to the config loader.
+        """
+        if self._config is not None:
+            return self._config
+
+        raise RunchLookupError(
+            f"RunchAsyncCustomConfig {self._config_name} has no cached config value."
+        )
 
     async def update(
         self,
