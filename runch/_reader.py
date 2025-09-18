@@ -266,6 +266,9 @@ class LoggableConfigReader:
     def __init__(self, config_logger: RunchCompatibleLogger | None) -> None:
         self._config_logger = config_logger
 
+    def set_logger(self, config_logger: RunchCompatibleLogger | None) -> None:
+        self._config_logger = config_logger
+
     def _log(
         self,
         level: RunchLogLevel,
