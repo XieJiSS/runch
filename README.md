@@ -204,6 +204,7 @@ class CustomConfigModel(RunchModel):
 ### Logging
 
 ```python
+import logging
 from logging import getLogger
 from typing import Any
 from runch import (
@@ -212,9 +213,11 @@ from runch import (
     RunchLogLevel,
 )
 
+logging.basicConfig(level=RunchLogLevel.INFO)
+
 class RunchLogAdapter:
     def log(self, level: RunchLogLevel, msg: str, /, *, exc_info: BaseException | None = None, **kwargs: Any):
-        getLogger("runch").log(level, msg, exc_info=exc_info, **kwargs)
+        getLogger("runch").log(level, f'{msg} %s', " ".join(["{k}={v}" for k, v in kwargs.items()]), exc_info=exc_info)
 
 class TestConfig(RunchModel):
     x: int
