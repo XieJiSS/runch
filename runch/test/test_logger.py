@@ -1,5 +1,6 @@
+import logging
+
 from time import sleep
-from logging import getLogger
 
 from typing import Any
 
@@ -8,6 +9,8 @@ from runch import (
     RunchConfigReader,
     RunchLogLevel,
 )
+
+logging.basicConfig(level=logging.INFO)
 
 
 class RunchLogAdapter:
@@ -21,7 +24,12 @@ class RunchLogAdapter:
         exc_info: BaseException | None = None,
         **kwargs: Any,
     ):
-        getLogger("runch").log(level, msg, exc_info=exc_info, **kwargs)
+        logging.getLogger("runch").log(
+            level,
+            f"{msg} %s",
+            " ".join([f"{key}={value}" for key, value in kwargs.items()]),
+            exc_info=exc_info,
+        )
 
 
 class TestConfig(RunchModel):

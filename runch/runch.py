@@ -143,7 +143,7 @@ class Runch[C: RunchModel](pydantic.RootModel[C]):
     def __repr__(self):
         sig = self.signature()
 
-        return f"<Runch of {sig.__qualname__}>"
+        return f"<Runch[{sig.__qualname__}]>"
 
     def __str__(self):
         return repr(self)

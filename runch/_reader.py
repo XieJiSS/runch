@@ -63,6 +63,7 @@ class RunchCompatibleLogger(Protocol):
         msg: str,
         /,
         *,
+        runch_config: Runch[Any] | None,
         exc_info: BaseException | None = None,
         **kwargs: Any,
     ) -> None: ...
@@ -281,6 +282,7 @@ class LoggableConfigReader:
                 level,
                 f"{type(self).__name__}(name={self._config_name}): {msg}",
                 exc_info=exc_info,
+                runch_config=self._config,
                 **kwargs,
             )
 
@@ -355,6 +357,15 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
                 self.set_feature(feature, value)
 
     def read(self) -> Runch[C]:
+        """Load config from file. If the config has been loaded before, it will be returned directly.
+
+        Use `update` to force reload the config.
+
+        This method is not thread-safe.
+
+        Returns:
+            Runch[C]: The loaded config.
+        """
         if self._config is not None:
             return self._config
 
@@ -373,18 +384,13 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
             self._error("config read failed", exc_info=e)
             raise
 
-        if (
-            self._config_version == versioned_config.version
-            and self._config is not None
-        ):
-            # no need to update the config
-            return self._config
-
         try:
             self._config = Runch[type_].fromDict(versioned_config.config)
         except Exception as e:
             self._error("config validate failed", exc_info=e)
             raise
+
+        self._info("config initialized")
 
         self._config_version = versioned_config.version
         self._config_updated_at = datetime.now()
@@ -440,6 +446,9 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
             else:
                 return
 
+        if self._config_version == versioned_config.version:
+            return
+
         try:
             new_config = Runch[type_].fromDict(versioned_config.config)
         except Exception as e:
@@ -449,10 +458,11 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
             else:
                 return
 
-        if self._config_version != versioned_config.version:
-            self._config.update(new_config)
-            self._config_version = versioned_config.version
-            self._config_updated_at = datetime.now()
+        self._config.update(new_config)
+        self._config_version = versioned_config.version
+        self._config_updated_at = datetime.now()
+
+        self._info("config changed", version=self._config_version)
 
     def read_lazy(self) -> Runch[C]:
         """
@@ -492,6 +502,8 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
 
                 that._config_version = versioned_config.version
                 that._config_updated_at = datetime.now()
+
+                that._info("lazy config evaluated")
 
                 return that._config.__getattribute__(name)
 
@@ -582,8 +594,6 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
                 else:
                     self_.update(overwrite_uninitialized=False)
 
-                self_._info("auto update finished")
-
                 del self_
 
             self_ = self_ref()
@@ -657,6 +667,15 @@ class RunchAsyncCustomConfigReader[C: RunchModel](LoggableConfigReader):
                 self.set_feature(feature, value)
 
     async def read(self) -> Runch[C]:
+        """Load config from file. If the config has been loaded before, it will be returned directly.
+
+        Use `update` to force reload the config.
+
+        This method is not thread-safe.
+
+        Returns:
+            Runch[C]: The loaded config.
+        """
         if self._config is not None:
             return self._config
 
@@ -680,6 +699,8 @@ class RunchAsyncCustomConfigReader[C: RunchModel](LoggableConfigReader):
         except Exception as e:
             self._error("config validate failed", exc_info=e)
             raise
+
+        self._info("config initialized")
 
         self._config_updated_at = datetime.now()
 
@@ -751,6 +772,8 @@ class RunchAsyncCustomConfigReader[C: RunchModel](LoggableConfigReader):
 
         self._config.update(new_config)
         self._config_updated_at = datetime.now()
+
+        self._info("config changed")
 
     def set_feature(
         self, feature: AsyncFeatureKey, feature_config: FeatureConfig
@@ -836,8 +859,6 @@ class RunchAsyncCustomConfigReader[C: RunchModel](LoggableConfigReader):
                     )
                 else:
                     await self_.update(overwrite_uninitialized=False)
-
-                self_._info("auto update finished")
 
                 del self_
 
