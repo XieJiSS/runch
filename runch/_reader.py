@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import os
 import threading
@@ -476,7 +477,17 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
         that = self
 
         class Proxy:
+            def __instancecheck__(self, instance: Any) -> bool:
+                if type(instance) is Proxy:
+                    return True
+                return False
+
             def __getattribute__(self, name: str) -> Any:
+                if name == "__class__":
+                    return type(self)
+                if name == "__instancecheck__":
+                    return inspect.getattr_static(self, name)
+
                 if that._config is not None:
                     return that._config.__getattribute__(name)
 
