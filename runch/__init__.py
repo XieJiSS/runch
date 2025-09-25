@@ -1,3 +1,5 @@
+from pydantic import Field
+
 from runch._reader import (
     FeatureConfig,
     RunchConfigReader,
@@ -14,6 +16,7 @@ from runch.runch import (
 )
 
 __all__ = [
+    "Field",
     "Runch",
     "RunchModel",
     "RunchLaxModel",
