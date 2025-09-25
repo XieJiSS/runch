@@ -8,6 +8,7 @@ from runch._reader import (
 from runch.runch import (
     Runch,
     RunchModel,
+    RunchLaxModel,
     RunchStrictModel,
     RunchLogLevel,
 )
@@ -15,6 +16,7 @@ from runch.runch import (
 __all__ = [
     "Runch",
     "RunchModel",
+    "RunchLaxModel",
     "RunchStrictModel",
     "RunchConfigReader",
     "RunchAsyncCustomConfigReader",

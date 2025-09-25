@@ -1,6 +1,7 @@
 from time import sleep
 from runch import (
     RunchModel,
+    RunchLaxModel,
     RunchStrictModel,
     RunchConfigReader,
 )
@@ -8,6 +9,10 @@ from runch import (
 
 class TestConfig(RunchModel):
     x: int
+
+
+class TestLaxConfig(RunchLaxModel):
+    x: set[int]
 
 
 class TestStrictConfig(RunchStrictModel):
@@ -19,6 +24,12 @@ test_strict_reader = RunchConfigReader[TestStrictConfig](
 )
 test_strict_config = test_strict_reader.read()
 print("test_strict_config", test_strict_config.config)
+
+test_lax_reader = RunchConfigReader[TestLaxConfig](
+    config_name="test_lax.yaml", config_dir="runch/test"
+)
+test_lax_config = test_lax_reader.read()
+print("test_lax_config", test_lax_config.config)
 
 test_reader = RunchConfigReader[TestConfig](
     config_name="test.yaml", config_dir="runch/test"

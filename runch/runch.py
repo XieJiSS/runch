@@ -52,6 +52,8 @@ class RunchModel(pydantic.BaseModel):
 
 
 class RunchStrictModel(RunchModel):
+    """RunchModel but with stricter validation: Disallows unrecognized fields."""
+
     model_config = pydantic.ConfigDict(
         extra="forbid",
         strict=True,
@@ -62,6 +64,18 @@ class RunchStrictModel(RunchModel):
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
 
+class RunchLaxModel(RunchModel):
+    """RunchModel but with looser validation: Allows some implicit type conversions."""
+
+    model_config = pydantic.ConfigDict(
+        extra="ignore",
+        strict=False,
+        protected_namespaces=(),
+        use_enum_values=True,
+    )
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
 
 class RunchLogLevel(enum.IntEnum):
     DEBUG = logging.DEBUG
