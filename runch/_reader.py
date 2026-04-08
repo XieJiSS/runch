@@ -40,7 +40,9 @@ from typing import (
 
 
 M = TypeVar("M", bound=RunchModel)
-FeatureKey: TypeAlias = Literal["watch_update", "merge_example"]
+FeatureKey: TypeAlias = Literal[
+    "watch_update", "merge_example", "register_to_config_server"
+]
 AsyncFeatureKey: TypeAlias = Literal["watch_update"]
 SupportedFileType: TypeAlias = Literal["yaml", "json", "toml"]
 
@@ -140,6 +142,7 @@ def parse_file_name(file_name: str) -> FileNameInfo:
 class VersionedConfig(NamedTuple):
     config: dict[Any, Any]
     version: bytes
+    raw_content: str
 
 
 def read_config(
@@ -174,6 +177,7 @@ def read_config(
                         custom_loader=custom_loader,
                     ),
                     version=version,
+                    raw_content=content,
                 )
             else:
                 return VersionedConfig(
@@ -184,6 +188,7 @@ def read_config(
                         custom_loader=custom_loader,
                     ),
                     version=version,
+                    raw_content=content,
                 )
 
     real_config: dict[Any, Any] = {}
@@ -233,19 +238,38 @@ def read_config(
             example_config, real_config, strategy=mergedeep.Strategy.TYPESAFE_REPLACE
         ),
     )
+    raw_content = raw_configs_bytes.decode(encoding=config_encoding)
     return VersionedConfig(
-        config=merged_config, version=blake2b(raw_configs_bytes).digest()
+        config=merged_config,
+        version=blake2b(raw_configs_bytes).digest(),
+        raw_content=raw_content,
     )
 
 
 _CONFIG_READER_DEFAULT_FEATURES: dict[FeatureKey, FeatureConfig] = {
     "watch_update": FeatureConfig(enabled=False, args={}),
     "merge_example": FeatureConfig(enabled=False, args={}),
+    "register_to_config_server": FeatureConfig(enabled=False, args={}),
 }
 
 _CUSTOM_A_CONFIG_READER_DEFAULT_FEATURES: dict[AsyncFeatureKey, FeatureConfig] = {
     "watch_update": FeatureConfig(enabled=False, args={}),
 }
+
+# Global registry for config server: maps (config_dir, config_name) -> weakref to reader
+_config_server_registry: dict[tuple[str, str], weakref.ref[RunchConfigReader[Any]]] = {}
+
+
+def get_config_server_registry() -> (
+    dict[tuple[str, str], weakref.ref[RunchConfigReader[Any]]]
+):
+    """Get the global config server registry. The registry maps (config_dir, config_name) to weak references of RunchConfigReader instances that have the "register_to_config_server" feature enabled.
+
+    Modifying the returned registry has to be done with caution, and it is recommended to use the "register_to_config_server" feature of RunchConfigReader instead.
+    """
+
+    return _config_server_registry
+
 
 T = TypeVar("T")
 U = TypeVarTuple("U")
@@ -316,6 +340,8 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
 
     _custom_config_parser: Callable[[str], dict[Any, Any]] | None
 
+    _raw_config_content: str | None
+
     _features: MutableMapping[FeatureKey, FeatureConfig]
     _auto_update_started: bool
 
@@ -343,6 +369,7 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
         self._config_encoding = config_encoding
         self._config_schema = get_generic_arg_kv_map(get_orig_class(self))[C]
         self._custom_config_parser = custom_config_parser
+        self._raw_config_content = None
         self._features = {}
         self._config_updated_at = None
         self._config_version = None
@@ -394,6 +421,7 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
         self._info("config initialized")
 
         self._config_version = versioned_config.version
+        self._raw_config_content = versioned_config.raw_content
         self._config_updated_at = datetime.now()
 
         return self._config
@@ -461,6 +489,7 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
 
         self._config.update(new_config)
         self._config_version = versioned_config.version
+        self._raw_config_content = versioned_config.raw_content
         self._config_updated_at = datetime.now()
 
         self._info("config changed", version=self._config_version)
@@ -512,6 +541,7 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
                     raise
 
                 that._config_version = versioned_config.version
+                that._raw_config_content = versioned_config.raw_content
                 that._config_updated_at = datetime.now()
 
                 that._info("lazy config evaluated")
@@ -539,11 +569,26 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
             - args: `{"update_interval": n, "on_update_error": "ignore" | "raise"}`, where `update_interval` is always required.
         - feature="merge_example": Merge the example config with the actual config. This is useful for development.
             - args: `{}`.
+        - feature="register_to_config_server": Register this reader to the global config server registry.
+            - args: `{}`.
         """
         self._features[feature] = feature_config
 
         if feature == "watch_update" and feature_config["enabled"]:
             self._start_auto_update()
+
+        if feature == "register_to_config_server":
+            registry_key = (self._config_dir, self._config_name)
+            if feature_config["enabled"]:
+                _config_server_registry[registry_key] = weakref.ref(self)
+            else:
+                existing_ref = _config_server_registry.get(registry_key)
+                # check if the existing ref is dead or is self before removing, to avoid gc race condition
+                # where another reader is created with the same config
+                if existing_ref is not None and (
+                    existing_ref() is None or existing_ref() is self
+                ):
+                    _config_server_registry.pop(registry_key, None)
 
         return self
 
@@ -621,12 +666,18 @@ class RunchConfigReader[C: RunchModel](LoggableConfigReader):
             # not initialized yet
             return
         self.set_feature("watch_update", FeatureConfig(enabled=False, args={}))
+        self.set_feature(
+            "register_to_config_server", FeatureConfig(enabled=False, args={})
+        )
 
     def close(self):
         if not hasattr(self, "_features"):
             # not initialized yet
             return
         self.set_feature("watch_update", FeatureConfig(enabled=False, args={}))
+        self.set_feature(
+            "register_to_config_server", FeatureConfig(enabled=False, args={})
+        )
 
 
 class RunchAsyncCustomConfigReader[C: RunchModel](LoggableConfigReader):

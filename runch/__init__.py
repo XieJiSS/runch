@@ -7,6 +7,7 @@ from runch._reader import (
     RunchCompatibleLogger,
     require_lazy_runch_configs,
 )
+from runch._server import start_runch_config_server
 from runch.runch import (
     Runch,
     RunchModel,
@@ -27,4 +28,5 @@ __all__ = [
     "RunchLogLevel",
     "FeatureConfig",
     "require_lazy_runch_configs",
+    "start_runch_config_server",
 ]
