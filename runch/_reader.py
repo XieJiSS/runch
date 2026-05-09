@@ -38,7 +38,6 @@ from typing import (
     get_args,
 )
 
-
 M = TypeVar("M", bound=RunchModel)
 FeatureKey: TypeAlias = Literal[
     "watch_update", "merge_example", "register_to_config_server"
@@ -51,6 +50,9 @@ _USER_CUSTOM_FILE_TYPE: _UserCustomFileType = "_user_custom"
 
 _RUNCH_DEFAULT_CONFIG_DIR = os.environ.get(
     "RUNCH_CONFIG_DIR", os.path.join(os.getcwd(), "etc")
+)
+_RUNCH_ENABLE_ERROR_FALLBACK_LOGGING = (
+    os.environ.get("RUNCH_ENABLE_ERROR_FALLBACK_LOGGING", "") == "1"
 )
 
 _SupportedFileType: TypeAlias = SupportedFileType | _UserCustomFileType
@@ -309,6 +311,15 @@ class LoggableConfigReader:
                 exc_info=exc_info,
                 runch_config=self._config,
                 **kwargs,
+            )
+        elif level >= RunchLogLevel.ERROR and _RUNCH_ENABLE_ERROR_FALLBACK_LOGGING:
+            import sys
+
+            if exc_info is not None:
+                msg += f" - Exception: {exc_info!r}"
+            print(
+                f"[runch] {type(self).__name__}(name={self._config_name}): {msg}",
+                file=sys.stderr,
             )
 
     def _debug(self, msg: str, exc_info: BaseException | None = None, **kwargs: Any):
